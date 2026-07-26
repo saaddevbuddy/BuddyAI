@@ -7,32 +7,50 @@ import platform
 import pyautogui
 from pycaw.pycaw import AudioUtilities
 import socket
+from modules.apps import handle_apps
+from modules.browser import handle_browser
+from modules.system import handle_system
+from modules.notes import handle_notes
+from modules.reminder import handle_reminder
+from modules.brain import handle_brain
 
 def handle_command(command, speak):
     command = command.lower()
+   # ------------------- Brain Module -------------------
+
+    reply = handle_brain(command, speak)
+
+    if reply:
+        return reply
+
+    # ------------------- Apps Module -------------------
+    reply = handle_apps(command, speak)
+    if reply:
+        return reply
+
+    # ------------------- Browser Module -------------------
+    reply = handle_browser(command, speak)
+    if reply:
+        return reply
+
+    # ------------------- System Module -------------------
+    reply = handle_system(command, speak)
+    if reply:
+        return reply
+    # ------------------- Notes Module -------------------
+
+    reply = handle_notes(command, speak)
+
+    if reply:
+        return reply
+    # ------------------- Reminder Module -------------------
+
+    reply = handle_reminder(command, speak)
+
+    if reply:
+        return reply
+ 
     memory = load_memory()
-
-    # ------------------- Notepad -------------------
-    if "notepad" in command or "pad" in command:
-        reply = "Notepad khol raha hoon."
-        speak(reply)
-        os.system("notepad")
-        return reply
-
-    # ------------------- Calculator -------------------
-    if "calculator" in command or "calc" in command:
-        reply = "Calculator khol raha hoon."
-        speak(reply)
-        os.system("calc")
-        return reply
-
-    # ------------------- Paint -------------------
-    if "paint" in command:
-        reply = "Paint khol raha hoon."
-        speak(reply)
-        os.system("mspaint")
-        return reply
-
     # ------------------- Chrome -------------------
     if "chrome" in command or "krom" in command:
         reply = "Chrome khol raha hoon."
@@ -40,71 +58,9 @@ def handle_command(command, speak):
         os.system("start chrome")
         return reply
 
-    # ------------------- YouTube Search -------------------
-    if "youtube" in command and "search" in command:
-        query = (
-            command.replace("youtube par", "")
-                .replace("youtube per", "")
-                .replace("youtube pe", "")
-                .replace("youtube", "")
-                .replace("search karo", "")
-                .replace("search", "")
-                .strip()
-)
 
-        reply = f"YouTube par {query} search kar raha hoon."
-        speak(reply)
-        webbrowser.open(
-            f"https://www.youtube.com/results?search_query={query}"
-        )
-        return reply
 
-    # ------------------- YouTube -------------------
-    if "youtube" in command:
-        reply = "YouTube khol raha hoon."
-        speak(reply)
-        webbrowser.open("https://www.youtube.com")
-        return reply
-
-    # ------------------- ChatGPT -------------------
-    if "chatgpt" in command:
-        reply = "ChatGPT khol raha hoon."
-        speak(reply)
-        webbrowser.open("https://chatgpt.com")
-        return reply
-
-    # ------------------- Google Search -------------------
-    if "google" in command and "search" in command:
-        query = (
-            command.replace("google par", "")
-                .replace("google per", "")
-                .replace("google pe", "")
-                .replace("google", "")
-                .replace("search karo", "")
-                .replace("search", "")
-                .strip()
-)
-
-        reply = f"Google par {query} search kar raha hoon."
-        speak(reply)
-        webbrowser.open(
-            f"https://www.google.com/search?q={query}"
-        )
-        return reply
-
-    # ------------------- Google -------------------
-    if "google" in command:
-        reply = "Google khol raha hoon."
-        speak(reply)
-        webbrowser.open("https://www.google.com")
-        return reply
-
-    # ------------------- Time -------------------
-    if "time" in command or "waqt" in command:
-        current_time = datetime.datetime.now().strftime("%I:%M %p")
-        reply = f"Waqt hua hai {current_time}"
-        speak(reply)
-        return reply
+    
 
     # ------------------- Downloads -------------------
     if "downloads" in command or "download" in command:
