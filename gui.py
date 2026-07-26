@@ -5,16 +5,19 @@ from main import speak
 from voice import speak
 from voice import speak, listen
 def voice_command():
+    status.config(text="Status: Listening...")
     message = listen()
 
     if message:
         chat_box.config(state="normal")
         chat_box.insert(tk.END, f"\n👤 Saad: {message}\n")
+        status.config(text="Status: Thinking...")
 
         reply = handle_command(message, speak)
 
         if reply:
             chat_box.insert(tk.END, f"🤖 Buddy: {reply}\n")
+            status.config(text="Status: Ready")
 
         chat_box.config(state="disabled")
         chat_box.see(tk.END)
@@ -26,6 +29,7 @@ def send_message():
     
     reply = handle_command(message, speak)
     chat_box.insert(tk.END, f"🤖 Buddy: {reply}\n")
+    status.config(text="Status: Ready")
     chat_box.see(tk.END)
     chat_box.config(state="disabled")
 
