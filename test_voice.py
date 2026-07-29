@@ -1,8 +1,16 @@
 import pyttsx3
+import speech_recognition as sr
 
 engine = pyttsx3.init()
 
-engine.say("Assalam o Alaikum Saad")
-engine.runAndWait()
+engine.setProperty("rate", 150)
+engine.setProperty("volume", 1.0)
 
-print("Voice test complete")
+voices = engine.getProperty("voices")
+engine.setProperty("voice", voices[1].id)
+
+
+def speak(text):
+    print("🤖 Buddy:", text)
+    engine.say(text)
+    engine.runAndWait()

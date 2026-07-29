@@ -1,10 +1,11 @@
 {
     "name": "saad",
-    "favorite_game": "pubg",
+    "favorite_game": "ets2",
     "favorite_colour": "black",
     "favorite_food": "biryani",
     "hobby": "gaming",
     "context": {
-        "last_topic": "favorite_game"
-    }
+        "last_topic": "name"
+    },
+    "favourite_game": "ets 2"
 }

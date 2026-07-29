@@ -2,7 +2,7 @@ import os
 
 
 
-def handle_apps(command, speak):
+def handle_apps(command, intent, speak):
 
     if "notepad" in command or "pad" in command:
         reply = "Notepad khol raha hoon."
@@ -10,7 +10,7 @@ def handle_apps(command, speak):
         os.system("notepad")
         return reply
 
-    if "calculator" in command or "calc" in command:
+    if intent == "calculator":
         reply = "Calculator khol raha hoon."
         speak(reply)
         os.system("calc")
