@@ -15,10 +15,14 @@ from modules.notes import handle_notes
 from modules.reminder import handle_reminder
 
 from modules.brain import handle_brain
-from modules.intent import detect_intent
+from modules.intent import detect_intent, has_intent
 
 from modules.ai import ask_ai
 from modules.history import add_history, last_command, total_conversations, clear_history
+from modules.profile import handle_profile
+from modules.smart_memory import handle_smart_memory
+from modules.ai import ask_ai, extract_memory
+from memory import load_memory, save_memory
 
 def handle_command(command, speak):
     previous = last_command()
@@ -39,7 +43,10 @@ def handle_command(command, speak):
     if reply:
         return reply
 
+    reply = handle_smart_memory(command, speak)
 
+    if reply:
+        return reply
 
     # =========================
     # Applications
@@ -83,8 +90,16 @@ def handle_command(command, speak):
     if reply:
         return reply
 
+    # =========================
+    # Profile
+    # =========================
 
+    reply = handle_profile(command, speak)
 
+    if reply:
+        return reply
+
+    
     # =========================
     # Reminder
     # =========================
@@ -97,6 +112,8 @@ def handle_command(command, speak):
 
 
     memory = load_memory()
+
+
     # =========================
     # Conversation Count
     # =========================
@@ -161,150 +178,7 @@ def handle_command(command, speak):
         speak(reply)
 
         return reply
-    # =========================
-    # Favourite Game Memory
-    # =========================
-
-    if (
-        "mera favourite game" in command
-        and (
-                "kya hai" in command
-                or "kon sa" in command
-                or "kaun sa" in command
-                or "yaad hai" in command
-            )
-    ):
-        if "favourite_game" in memory:
-            reply = f"Sir, aapka favourite game {memory['favourite_game']} hai."
-        else:
-            reply = "Sir, mujhe abhi aapka favourite game yaad nahi hai."
-
-        speak(reply)
-        return reply
-
-
-
-    if "mera favourite game" in command and "hai" in command:
-
-        game = (
-            command
-            .replace("mera favourite game", "")
-            .replace("hai", "")
-            .strip()
-        )
-
-        memory["favourite_game"] = game
-
-        save_memory(memory)
-
-        reply = (
-            f"Theek hai Sir, maine yaad rakh liya "
-            f"ke aapka favourite game {game} hai."
-        )
-
-        speak(reply)
-        return reply
-
-
-
-    # =========================
-    # Battery Information
-    # =========================
-
-    if "battery" in command:
-
-        battery = psutil.sensors_battery()
-
-        if battery:
-
-            reply = (
-                f"Sir, battery {battery.percent} percent hai."
-            )
-
-        else:
-
-            reply = (
-                "Sir, battery information available nahi hai."
-            )
-
-        speak(reply)
-        return reply
-
-
-
-    # =========================
-    # RAM Information
-    # =========================
-
-    if "ram" in command:
-
-        ram = psutil.virtual_memory()
-
-        total = round(
-            ram.total / (1024 ** 3), 2
-        )
-
-        used = round(
-            ram.used / (1024 ** 3), 2
-        )
-
-        reply = (
-            f"Sir, total RAM {total} GB hai. "
-            f"Used RAM {used} GB hai. "
-            f"RAM usage {ram.percent} percent hai."
-        )
-
-        speak(reply)
-        return reply
-
-
-
-    # =========================
-    # CPU Usage
-    # =========================
-
-    if "cpu" in command:
-
-        cpu = psutil.cpu_percent(interval=1)
-
-        reply = (
-            f"Sir, CPU usage {cpu} percent hai."
-        )
-
-        speak(reply)
-        return reply
-
-
-
-    # =========================
-    # Disk Storage
-    # =========================
-
-    if (
-        "disk" in command
-        or "storage" in command
-        or "space" in command
-    ):
-
-        disk = psutil.disk_usage("C:\\")
-
-        total = round(
-            disk.total / (1024 ** 3), 2
-        )
-
-        free = round(
-            disk.free / (1024 ** 3), 2
-        )
-
-
-        reply = (
-            f"Sir, C drive total {total} GB hai. "
-            f"Free space {free} GB hai."
-        )
-
-        speak(reply)
-        return reply
-
+   
 
 
     # =========================
@@ -323,20 +197,22 @@ def handle_command(command, speak):
         return reply
 
 
-
     # =========================
     # Windows Version
     # =========================
 
-    if "windows" in command or "version" in command:
+    if (
+        "windows version" in command
+        or "pc version" in command
+        or "system version" in command
+    ):
 
         version = platform.platform()
 
-        reply = (
-            f"Sir, aap {version} use kar rahe hain."
-        )
+        reply = f"Sir, aap {version} use kar rahe hain."
 
         speak(reply)
+
         return reply
 
 
@@ -510,25 +386,50 @@ def handle_command(command, speak):
 
         speak(reply)
         return reply
+    # =========================
+    # Buddy Version
+    # =========================
+
+    if (
+        "version" in command
+        or "buddy version" in command
+        or "tumhara version" in command
+    ):
+
+        reply = "Sir, main Buddy AI Version 0.3 hoon. Muhammad Saad aur unke Sir mujhe develop kar rahe hain."
+
+        speak(reply)
+
+        return reply
+
+    # =========================
+    # Gemini Memory
+    # =========================
+
+    memory = extract_memory(command)
+
+    if memory:
+
+        data = load_memory()
+
+        if "profile" not in data:
+            data["profile"] = {}
+
+        data["profile"].update(memory)
+
+        save_memory(data)
 
 
     # =========================
     # Gemini AI Fallback
     # =========================
 
-    reply = ask_ai(command)
+    reply = ask_ai(
+        command,
+        memory_context=str(load_memory().get("profile", {}))
+    )
 
     if reply:
         add_history(command, reply)
         speak(reply)
         return reply
-
-    # =========================
-    # No Answer
-    # =========================
-
-    reply = "Sir, mujhe is baat ka jawab nahi mila."
-
-    speak(reply)
-
-    return reply

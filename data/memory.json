@@ -1,11 +1,26 @@
 {
-    "name": "saad",
-    "favorite_game": "ets2",
-    "favorite_colour": "black",
-    "favorite_food": "biryani",
-    "hobby": "gaming",
-    "context": {
-        "last_topic": "name"
+    "profile": {
+        "name": "Saad",
+        "age": "20",
+        "city": "Mianwali",
+        "country": "",
+        "favorite_game": "ETS 2",
+        "favorite_colour": "Black",
+        "favorite_food": "Biryani",
+        "favorite_phone": "Samsung S24 Ultra",
+        "favorite_car": "",
+        "favorite_youtuber": "",
+        "favorite_ai": "",
+        "dream": "Buddyai Banana",
+        "goal": "",
+        "hobby": "Gaming"
     },
-    "favourite_game": "ets 2"
+    "context": {
+        "last_topic": ""
+    },
+    "user_preferences": {
+        "language": "roman urdu",
+        "voice": "male",
+        "theme": "dark"
+    }
 }

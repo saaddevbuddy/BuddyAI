@@ -161,3 +161,93 @@ def handle_system(command, speak):
         speak(reply)
         return reply
     return None
+    # ------------------- Battery -------------------
+
+    if "battery" in command:
+
+        battery = psutil.sensors_battery()
+
+        if battery:
+            reply = f"Sir, battery {battery.percent} percent hai."
+        else:
+            reply = "Sir, battery information available nahi hai."
+
+        speak(reply)
+        return reply
+    # ------------------- RAM -------------------
+
+    if "ram" in command:
+
+        ram = psutil.virtual_memory()
+
+        total = round(ram.total / (1024 ** 3), 2)
+        used = round(ram.used / (1024 ** 3), 2)
+
+        reply = (
+            f"Sir, total RAM {total} GB hai. "
+            f"Used RAM {used} GB hai. "
+            f"RAM usage {ram.percent} percent hai."
+        )
+
+        speak(reply)
+        return reply
+    # ------------------- CPU -------------------
+
+    if "cpu" in command:
+
+        cpu = psutil.cpu_percent(interval=1)
+
+        reply = f"Sir, CPU usage {cpu} percent hai."
+
+        speak(reply)
+
+        return reply
+    # ------------------- Disk -------------------
+
+    if (
+        "disk" in command
+        or "storage" in command
+        or "space" in command
+    ):
+
+        disk = psutil.disk_usage("C:\\")
+
+        total = round(disk.total / (1024 ** 3), 2)
+        free = round(disk.free / (1024 ** 3), 2)
+
+        reply = (
+            f"Sir, C drive total {total} GB hai. "
+            f"Free space {free} GB hai."
+        )
+
+        speak(reply)
+
+        return reply
+    # ------------------- PC Name -------------------
+
+    if "pc name" in command or "computer name" in command:
+
+        name = os.environ["COMPUTERNAME"]
+
+        reply = f"Sir, aapke computer ka naam {name} hai."
+
+        speak(reply)
+
+        return reply
+
+
+    # ------------------- Windows Version -------------------
+
+    if (
+        "windows version" in command
+        or "pc version" in command
+        or "system version" in command
+    ):
+
+        version = platform.platform()
+
+        reply = f"Sir, aap {version} use kar rahe hain."
+
+        speak(reply)
+
+        return reply

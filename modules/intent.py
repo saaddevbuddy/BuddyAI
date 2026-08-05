@@ -203,3 +203,9 @@ def detect_intent(command):
                 return intent
 
     return None
+
+def has_intent(command, intent):
+
+    detected = detect_intent(command)
+
+    return detected == intent

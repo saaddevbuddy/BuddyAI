@@ -1,10 +1,82 @@
 [
     {
-        "user": "he badi aaj kya seen hai",
-        "buddy": "Sab set hai Sir! Aap batayein aaj kya plan hai? Koi zaroori kaam karna hai ya bas chill karne ka mood hai?"
+        "user": "me 20 year ka houn",
+        "buddy": "Zabardast Sir! 20 saal ki umar toh zindagi ka bohot behtareen aur aham daur hoti hai. Is umar mein naye goals set karne aur aage barhne ke bohot mauqay miltay hain. \n\nAap abhi kya kar rahe hain, parhai ya koi job?"
     },
     {
-        "user": "bus aap mein improvement",
-        "buddy": "Bilkul Sir, main poori koshish karunga ke waqt ke sath aur behtar ho sakoon. Aap bas mujhe bataate rahein, main aap ki har tarah se behtar madad karne ke liye tayyar hoon. \n\nAaj hum kis topic par baat karein?"
+        "user": "meri  age kya hai",
+        "buddy": "Sir, mujhe aap ki age ke baare mein abhi pata nahi hai. Agar aap batana chahein toh mujhe bata sakte hain!"
+    },
+    {
+        "user": "mera dream",
+        "buddy": "Aap ka dream kya hai, Sir? Mujh se share karein, main zaroor sunna chahoon ga!"
+    },
+    {
+        "user": "mera dream btao",
+        "buddy": "Sir, aapka dream 'Buddy AI' banana hai. Aur mujhe poora yaqeen hai ke aap apna ye khwab zaroor poora karenge!"
+    },
+    {
+        "user": "mera city kiya hay",
+        "buddy": "Sir, aap ka city Mianwali hai."
+    },
+    {
+        "user": "main theek hun",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "hey bud",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "main kaun hun",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "ham",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "main kaun hun",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "yaar gemeni error de raha",
+        "buddy": "Gemini Error: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'This model models/gemini-2.5-flash-lite is no longer available to new users. Please update your code to use a newer model for the latest features and improvements.', 'status': 'NOT_FOUND'}}"
+    },
+    {
+        "user": "main kaun hun",
+        "buddy": "Sir, API limit complete ho gayi hai. Thori dair baad try karein."
+    },
+    {
+        "user": "main kaun hun",
+        "buddy": "Aap Saad hain, Sir! \n\nMujhe aap ke baare mein yaad hai ke aap Mianwali se hain, aap ki umer 20 saal hai, aur aapka dream BuddyAI banana hai. Aap ko gaming (khas tor par ETS 2) aur Biryani bhi bohot pasand hai. \n\nKya main ne sahi bataya?"
+    },
+    {
+        "user": "ap ny thek btaya",
+        "buddy": "Bohat shukriya Sir! Mujhe khushi hui ke aap ko jawab sahi laga. \n\nAur bataen, aaj main aap ki mazeed kya madad kar sakta hoon?"
+    },
+    {
+        "user": "tu buddi da",
+        "buddy": "Ji Sir, main Buddy hoon! Batayein, aaj main aapki kya madad kar sakta hoon?"
+    },
+    {
+        "user": "twitter kholo",
+        "buddy": "Sir, main aapke device par direct Twitter open nahi kar sakta. Aap apne browser me [twitter.com](https://twitter.com) (X) open kar sakte hain ya Twitter ki app use kar sakte hain. \n\nAgar aapko koi tweet ya post likhne me help chahiye, toh mujhe batayein!"
+    },
+    {
+        "user": "aaj date kaun si hai",
+        "buddy": "Sir, aaj ki date {{CURRENT_DATE}} hai. Agar aapko koi khas schedule ya calendar event check karna hai toh mujhe batayein!"
+    },
+    {
+        "user": "kya aaj koi",
+        "buddy": "Ji Sir? Aapka message adhoora lag raha hai. Aap kya poochna chah rahe thay?"
+    },
+    {
+        "user": "aaj duniya mein",
+        "buddy": "Ji Sir? Aap aaj ki duniya ke baare mein kya janna chahte hain? Jaise ke current affairs, technology, news, ya koi specific topic? \n\nAap poora sawal batayein, main aapko detail me jawab doonga."
+    },
+    {
+        "user": "koi event",
+        "buddy": "Sir, aap kis tarah ke event ki baat kar rahe hain? \n\nKya aap Euro Truck Simulator 2 ka koi multiplayer event dhoond rahe hain, ya kisi real-life event ke baare me pooch rahe hain? Thodi detail batayein taakay main aapki sahi madad kar sakoon."
     }
 ]
