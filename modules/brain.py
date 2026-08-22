@@ -1,5 +1,5 @@
 import random
-
+import re
 brain = {
     "khush": [
         "MashaAllah! Allah aap ko hamesha khush rakhe.",
@@ -204,17 +204,24 @@ brain = {
     ]
 }
 
-
 def get_reply(message):
     message = message.lower()
 
     for key, replies in brain.items():
-        if key in message:
-            return random.choice(replies)
+
+        # Single word match
+        if " " not in key:
+            words = re.findall(r"\b\w+\b", message)
+
+            if key in words:
+                return random.choice(replies)
+
+        # Sentence match
+        else:
+            if key in message:
+                return random.choice(replies)
 
     return None
-
-
 def handle_brain(message, speak=None):
     """
     Brain se reply do.

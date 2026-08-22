@@ -1,5 +1,4 @@
-from memory import load_memory, save_memory
-
+from modules.memory import load_memory, save_memory
 PROFILE_FIELDS = {
     "name": "name",
     "favorite game": "favorite_game",

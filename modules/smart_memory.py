@@ -1,6 +1,6 @@
 import re
 
-from memory import load_memory, save_memory
+from modules.memory import load_memory, save_memory
 
 
 MEMORY_PATTERNS = {

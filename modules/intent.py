@@ -1,3 +1,4 @@
+import re
 INTENTS = {
 
     # ------------------- Apps -------------------
@@ -197,13 +198,23 @@ def detect_intent(command):
 
     command = command.lower()
 
+    words = re.findall(r"\b\w+\b", command)
+
     for intent, keywords in INTENTS.items():
+
         for keyword in keywords:
-            if keyword in command:
-                return intent
+
+            # Single Word
+            if " " not in keyword:
+                if keyword in words:
+                    return intent
+
+            # Multi Word
+            else:
+                if keyword in command:
+                    return intent
 
     return None
-
 def has_intent(command, intent):
 
     detected = detect_intent(command)

@@ -1,6 +1,6 @@
 import webbrowser
 import os
-
+import re
 def handle_browser(command, speak):
 
     # ------------------- YouTube Search -------------------
@@ -28,12 +28,21 @@ def handle_browser(command, speak):
 
     # ------------------- YouTube -------------------
 
-    if "youtube" in command:
+    words = re.findall(r"\b\w+\b", command.lower())
+
+    youtube_commands = [
+        "youtube",
+        "open youtube",
+        "youtube kholo",
+        "youtube open karo",
+        "youtube chalao"
+    ]
+
+    if command.lower() in youtube_commands or "youtube" in words:
         reply = "YouTube khol raha hoon."
         speak(reply)
         webbrowser.open("https://www.youtube.com")
         return reply
-
     # ------------------- Google Search -------------------
 
     if "google" in command and "search" in command:

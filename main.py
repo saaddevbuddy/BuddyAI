@@ -1,4 +1,3 @@
-import pyttsx3
 import speech_recognition as sr
 import datetime
 import random
@@ -8,6 +7,7 @@ from commands import handle_command
 from voice import speak, listen
 from modules.brain import handle_brain
 from modules.router import route
+from modules.scheduler import start_scheduler
 def save_name(name):
     file = open("name.txt", "w")
     file.write(name)
@@ -77,8 +77,17 @@ def chat():
 
         if reply:
             speak(f"{name}, {reply}")
+
+
 def start_buddy():
+
+    print("Buddy AI Starting...")
+
+    # Reminder Scheduler Start
+    start_scheduler(speak)
+
     while True:
+
         print("\n==========================")
         print("       🤖 BUDDY AI")
         print("==========================")
@@ -101,4 +110,3 @@ def start_buddy():
 
 if __name__ == "__main__":
     start_buddy()
-        

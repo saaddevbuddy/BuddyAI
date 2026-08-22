@@ -6,11 +6,11 @@ import platform
 import psutil
 import pyautogui
 
-from memory import load_memory, save_memory
+from modules.memory import load_memory, save_memory
 
 from modules.apps import handle_apps
 from modules.browser import handle_browser
-from modules.system import handle_system
+from plugins.system import handle_system
 from modules.notes import handle_notes
 from modules.reminder import handle_reminder
 
@@ -22,7 +22,7 @@ from modules.history import add_history, last_command, total_conversations, clea
 from modules.profile import handle_profile
 from modules.smart_memory import handle_smart_memory
 from modules.ai import ask_ai, extract_memory
-from memory import load_memory, save_memory
+from modules.memory import load_memory, save_memory
 
 def handle_command(command, speak):
     previous = last_command()
@@ -32,6 +32,15 @@ def handle_command(command, speak):
     intent = detect_intent(command)
 
     print(f"Detected Intent: {intent}")
+
+    # =========================
+    # Profile
+    # =========================
+
+    reply = handle_profile(command, speak)
+
+    if reply:
+        return reply
 
 
     # =========================
@@ -86,15 +95,6 @@ def handle_command(command, speak):
     # =========================
 
     reply = handle_notes(command, speak)
-
-    if reply:
-        return reply
-
-    # =========================
-    # Profile
-    # =========================
-
-    reply = handle_profile(command, speak)
 
     if reply:
         return reply
