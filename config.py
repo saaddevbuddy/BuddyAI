@@ -1,11 +1,12 @@
 from pathlib import Path
+import os
 
 # ==========================
-# Project Information
+# Buddy AI Configuration
 # ==========================
 
 APP_NAME = "Buddy AI"
-VERSION = "1.0.0"
+VERSION = "2.0.0"
 
 # ==========================
 # Base Paths
@@ -25,8 +26,23 @@ HISTORY_FILE = DATA_DIR / "history.json"
 # Gemini AI
 # ==========================
 
-GEMINI_API_KEY = "AQ.Ab8RN6ISXd2HIvqBiEdgcGWN0EoI0n1ifmV_O2F1GpAn1af1rg"
-MODEL_NAME = "gemini-flash-latest"
+# Put your API key in Windows environment variable:
+# GEMINI_API_KEY
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# Current stable Gemini model
+MODEL_NAME = "gemini-3.6-flash"
+
+# Lightweight fallback model
+FALLBACK_MODEL_NAME = "gemini-2.5-flash-lite"
+
+# ==========================
+# AI Settings
+# ==========================
+
+AI_ENABLED = True
+AI_TIMEOUT = 30
 
 # ==========================
 # Voice

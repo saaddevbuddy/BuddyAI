@@ -1,50 +1,446 @@
+# ==========================================================
+# Buddy AI - Smart Router 3.5
+# Memory + Commands + Weather + Web Search + AI + Voice
+# Gemini -> APInex -> OpenCode Zen
+# ==========================================================
+
+import threading
+
 from commands import handle_command
+
 from modules.brain import handle_brain
-from modules.ai import ask_ai, extract_memory
+from modules.ai import extract_memory
+from modules.ai_manager import get_ai_response
 from modules.intent import detect_intent
 from modules.profile import handle_profile
 from modules.reminder import handle_reminder
 from modules.thinking import think
-from plugins.system import handle_system
 from modules.notes import handle_notes
 from modules.mood import analyze_mood
 from modules.history import add_history
-from modules.memory import save_extracted_memory
+
+from modules.memory import (
+    get_memory,
+    search_memory,
+    get_all_memory,
+    save_extracted_memory
+)
+
 from modules.weather import ask_weather
 from modules.buddy_mood_triggers import detect_buddy_mood_trigger
+from modules.diagnostics import diagnose
+from plugins.system import handle_system
 
-import threading
+try:
+    from modules.web_search import (
+        web_search,
+        format_search_results
+    )
+    WEB_SEARCH_AVAILABLE = True
+except Exception as e:
+    print(
+        "[Web Search] Module unavailable:",
+        repr(e)
+    )
+    WEB_SEARCH_AVAILABLE = False
 
 
 # ==========================================================
-# Buddy AI - Smart Router 3.0
-# GUI + Voice + Commands + AI + Memory
+# MEMORY QUESTION DETECTOR
 # ==========================================================
 
+def is_memory_question(text):
+
+    text = text.lower().strip()
+
+    memory_words = [
+        "favorite game",
+        "favourite game",
+        "favorite food",
+        "favourite food",
+        "favorite phone",
+        "favourite phone",
+        "favorite car",
+        "favourite car",
+        "favorite youtuber",
+        "favourite youtuber",
+        "favorite ai",
+        "favourite ai",
+        "hobby",
+        "dream",
+        "goal",
+        "mera game kya",
+        "meri game kya",
+        "mera favorite",
+        "mera favourite",
+        "meri favorite",
+        "meri favourite",
+        "mujhe kya pasand",
+        "mujhe kya acha lagta",
+        "mujhe kya achha lagta",
+        "mera phone kya",
+        "meri hobby kya",
+        "mera dream kya",
+        "mera goal kya",
+        "mera youtuber kaun",
+        "mera favorite youtuber kaun",
+        "mera favourite youtuber kaun"
+    ]
+
+    return any(
+        word in text
+        for word in memory_words
+    )
+
+
+# ==========================================================
+# FORMAT MEMORY REPLY
+# ==========================================================
+
+def format_memory_reply(results):
+
+    if not results:
+        return None
+
+    if "favorite_game" in results:
+        return (
+            f"Sir, aapka favorite game "
+            f"{results['favorite_game']} hai. 🎮"
+        )
+
+    if "favorite_food" in results:
+        return (
+            f"Sir, aapka favorite food "
+            f"{results['favorite_food']} hai. 🍛"
+        )
+
+    if "favorite_phone" in results:
+        return (
+            f"Sir, aapka favorite phone "
+            f"{results['favorite_phone']} hai. 📱"
+        )
+
+    if "favorite_car" in results:
+        return (
+            f"Sir, aapki favorite car "
+            f"{results['favorite_car']} hai. 🚙"
+        )
+
+    if "favorite_ai" in results:
+        return (
+            f"Sir, aapka favorite AI "
+            f"{results['favorite_ai']} hai. 🤖"
+        )
+
+    if "favorite_youtuber" in results:
+        return (
+            f"Sir, aapke favorite YouTuber "
+            f"{results['favorite_youtuber']} hain. ▶️"
+        )
+
+    if "hobby" in results:
+        return (
+            f"Sir, aapka hobby "
+            f"{results['hobby']} hai. 😎"
+        )
+
+    if "dream" in results:
+        return (
+            f"Sir, aapka dream "
+            f"{results['dream']} hai. ✨"
+        )
+
+    if "goal" in results:
+        return (
+            f"Sir, aapka goal "
+            f"{results['goal']} hai. 🎯"
+        )
+
+    return None
+
+
+# ==========================================================
+# MEMORY CONTEXT BUILDER
+# ==========================================================
+
+def build_memory_context():
+
+    try:
+
+        memory = get_all_memory()
+
+        if not memory:
+            return ""
+
+        lines = []
+
+        for key, value in memory.items():
+
+            if value is None:
+                continue
+
+            if isinstance(value, (dict, list)):
+                continue
+
+            lines.append(
+                f"{key}: {value}"
+            )
+
+        if not lines:
+            return ""
+
+        return "\n".join(lines)
+
+    except Exception as e:
+
+        print(
+            "Memory Context Error:",
+            repr(e)
+        )
+
+        return ""
+
+
+# ==========================================================
+# AI ERROR CHECK
+# ==========================================================
+
+def is_ai_error_message(text):
+
+    if not text:
+        return False
+
+    text = str(text).lower().strip()
+
+    error_phrases = [
+        "gemini api key ya authentication mein masla",
+        "gemini se response lene mein filhaal masla",
+        "gemini ki free-tier limit",
+        "gemini abhi bohat busy hai",
+        "ai brain mein filhaal masla",
+        "ai service unavailable",
+        "authentication error",
+        "authentication mein masla",
+        "temporarily unavailable",
+        "service unavailable",
+        "rate limit",
+        "too many requests",
+        "internal server error"
+    ]
+
+    return any(
+        phrase in text
+        for phrase in error_phrases
+    )
+
+
+# ==========================================================
+# WEB SEARCH DETECTOR
+# ==========================================================
+
+def is_web_search_request(text):
+
+    text = text.lower().strip()
+
+    search_phrases = [
+
+        # English
+        "search",
+        "search it",
+        "search this",
+        "search online",
+        "search the web",
+        "google it",
+        "google this",
+        "look it up",
+        "look up",
+        "find online",
+        "find on internet",
+        "check online",
+        "check internet",
+        "latest",
+        "latest news",
+        "breaking news",
+        "today's news",
+        "todays news",
+        "current news",
+        "current information",
+        "recent news",
+        "recent information",
+        "what happened today",
+        "what is happening",
+
+        # Roman Urdu
+        "internet se",
+        "net se",
+        "online se",
+        "google par",
+        "google pe",
+        "web par",
+        "web pe",
+        "internet par",
+        "internet pe",
+        "net par",
+        "net pe",
+        "taza khabar",
+        "taza khabrein",
+        "aaj ki khabar",
+        "aaj ki khabrein",
+        "aaj ki news",
+        "latest khabar",
+        "latest khabrein",
+        "haal ki khabar",
+        "abhi ki khabar",
+        "abhi kya hua",
+        "aaj kya hua",
+        "aaj kya ho raha",
+        "latest kya hai",
+        "latest kya chal raha",
+        "nayi khabar",
+        "nai khabar",
+        "maloom karo",
+        "pata karo",
+        "dekh kar batao",
+        "check karke batao",
+        "search karke batao"
+    ]
+
+    return any(
+        phrase in text
+        for phrase in search_phrases
+    )
+
+
+# ==========================================================
+# CLEAN WEB QUERY
+# ==========================================================
+
+def build_web_query(user_input):
+
+    query = str(
+        user_input
+    ).strip()
+
+    remove_phrases = [
+
+        "buddy",
+        "please",
+        "sir",
+        "search it",
+        "search this",
+        "search online",
+        "search the web",
+        "google it",
+        "google this",
+        "look it up",
+        "look up",
+        "find online",
+        "find on internet",
+        "check online",
+        "check internet",
+        "internet se",
+        "net se",
+        "online se",
+        "google par",
+        "google pe",
+        "web par",
+        "web pe",
+        "internet par",
+        "internet pe",
+        "net par",
+        "net pe",
+        "search karke batao",
+        "check karke batao",
+        "dekh kar batao",
+        "maloom karo",
+        "pata karo"
+    ]
+
+    for phrase in remove_phrases:
+
+        query = query.replace(
+            phrase,
+            " "
+        )
+
+    query = " ".join(
+        query.split()
+    ).strip()
+
+    if not query:
+        query = user_input
+
+    return query
+
+
+# ==========================================================
+# BUILD WEB-AWARE AI PROMPT
+# ==========================================================
+
+def build_web_ai_prompt(
+    user_input,
+    search_results,
+    memory_context
+):
+
+    formatted = format_search_results(
+        search_results
+    )
+
+    return f"""
+You are Buddy, a friendly personal AI companion.
+
+User message:
+{user_input}
+
+Fresh internet search results:
+{formatted}
+
+Buddy Memory:
+{memory_context}
+
+Instructions:
+
+1. Answer the user's actual question.
+2. Use the fresh search results when relevant.
+3. Do not invent facts that are not supported by the results.
+4. If the search results are unclear or insufficient, say so naturally.
+5. Answer in natural Roman Urdu.
+6. English technical names, proper names and terms can remain in English.
+7. Do not mention internal AI providers.
+8. Do not say you are GPT or another model.
+9. Address the user as Sir naturally.
+10. Keep the answer conversational and useful.
+"""
+
+
+# ==========================================================
+# MAIN ROUTER
+# ==========================================================
 
 def route(user_input, speak=None):
-
-    # ======================================================
-    # 1. BASIC CLEANUP
-    # ======================================================
 
     if user_input is None:
         return None
 
-    user_input = str(user_input).strip()
+    user_input = str(
+        user_input
+    ).strip()
 
     if not user_input:
         return None
 
+    print(
+        "\n========== GUI ROUTER =========="
+    )
+
+    print(
+        "User:",
+        user_input
+    )
+
     # ======================================================
-    # 2. REPLY CAPTURE SYSTEM
-    #
-    # Kisi module ne agar:
-    #
-    # speak("Hello Sir")
-    #
-    # kiya aur return None kiya,
-    # to Buddy ka reply phir bhi GUI tak pohanch sake.
+    # REPLY CAPTURE
     # ======================================================
 
     captured_reply = {
@@ -56,7 +452,9 @@ def route(user_input, speak=None):
         if text is None:
             return
 
-        text = str(text).strip()
+        text = str(
+            text
+        ).strip()
 
         if not text:
             return
@@ -67,10 +465,6 @@ def route(user_input, speak=None):
             "Buddy Spoken Reply:",
             repr(text)
         )
-
-        # ----------------------------------------------
-        # Actual voice background mein
-        # ----------------------------------------------
 
         if speak:
 
@@ -90,7 +484,7 @@ def route(user_input, speak=None):
                 )
 
     # ======================================================
-    # 3. BUDDY INTERNAL MOOD
+    # BUDDY MOOD TRIGGER
     # ======================================================
 
     try:
@@ -102,7 +496,8 @@ def route(user_input, speak=None):
         if buddy_trigger:
 
             print(
-                f"Buddy Mood Trigger: {buddy_trigger}"
+                "Buddy Mood Trigger:",
+                buddy_trigger
             )
 
     except Exception as e:
@@ -113,7 +508,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 4. INTENT
+    # INTENT
     # ======================================================
 
     try:
@@ -132,11 +527,12 @@ def route(user_input, speak=None):
         intent = None
 
     print(
-        f"\nDetected Intent: {intent}"
+        "Detected Intent:",
+        intent
     )
 
     # ======================================================
-    # 5. MOOD
+    # MOOD
     # ======================================================
 
     try:
@@ -144,6 +540,12 @@ def route(user_input, speak=None):
         mood_data = analyze_mood(
             user_input
         )
+
+        if not isinstance(
+            mood_data,
+            dict
+        ):
+            mood_data = {}
 
         mood_name = mood_data.get(
             "name",
@@ -189,15 +591,143 @@ def route(user_input, speak=None):
         f"({mood_confidence}%)"
     )
 
-    if matched_words:
+    # ======================================================
+    # MEMORY QUESTION
+    # ======================================================
 
-        print(
-            f"Matched Mood Words: "
-            f"{matched_words}"
-        )
+    if is_memory_question(
+        user_input
+    ):
+
+        try:
+
+            print(
+                "[Memory] Searching Buddy memory..."
+            )
+
+            memory_results = search_memory(
+                user_input
+            )
+
+            print(
+                "[Memory] Results:",
+                memory_results
+            )
+
+            memory_reply = format_memory_reply(
+                memory_results
+            )
+
+            if memory_reply:
+
+                print(
+                    "[Memory] Direct memory answer:",
+                    repr(memory_reply)
+                )
+
+                speak_proxy(
+                    memory_reply
+                )
+
+                try:
+
+                    add_history(
+                        user_input,
+                        memory_reply
+                    )
+
+                except Exception as e:
+
+                    print(
+                        "History Error:",
+                        repr(e)
+                    )
+
+                print(
+                    "GUI ROUTER RETURN:",
+                    repr(memory_reply)
+                )
+
+                return memory_reply
+
+            print(
+                "[Memory] No matching memory found."
+            )
+
+        except Exception as e:
+
+            print(
+                "[Memory] Search Error:",
+                repr(e)
+            )
 
     # ======================================================
-    # 6. WEATHER
+    # DIAGNOSTICS
+    # ======================================================
+
+    diagnostic_words = [
+
+        "system check",
+        "system check karo",
+        "apna system check karo",
+        "buddy check",
+        "buddy diagnostic",
+        "diagnostic",
+        "diagnostics",
+        "buddy health check",
+        "health check"
+    ]
+
+    if any(
+        word in user_input.lower()
+        for word in diagnostic_words
+    ):
+
+        try:
+
+            print(
+                "[Diagnostics] Running Buddy system check..."
+            )
+
+            diagnostic_reply = diagnose()
+
+            if diagnostic_reply:
+
+                diagnostic_reply = str(
+                    diagnostic_reply
+                ).strip()
+
+                speak_proxy(
+                    diagnostic_reply
+                )
+
+                print(
+                    "Diagnostic Reply:",
+                    repr(diagnostic_reply)
+                )
+
+                return diagnostic_reply
+
+        except Exception as e:
+
+            print(
+                "Diagnostics Error:",
+                repr(e)
+            )
+
+            diagnostic_reply = (
+                "Sir, system diagnostic chalane mein "
+                "problem aa gayi."
+            )
+
+            speak_proxy(
+                diagnostic_reply
+            )
+
+            return diagnostic_reply
+
+    # ======================================================
+    # WEATHER
     # ======================================================
 
     weather_text = user_input.lower()
@@ -243,12 +773,7 @@ def route(user_input, speak=None):
                 break
 
         if city is None:
-
             city = "Mianwali"
-
-        print(
-            f"Weather Request: {city}"
-        )
 
         try:
 
@@ -292,7 +817,152 @@ def route(user_input, speak=None):
             return reply
 
     # ======================================================
-    # 7. COMMANDS
+    # WEB SEARCH
+    # ======================================================
+
+    if is_web_search_request(
+        user_input
+    ):
+
+        print(
+            "\n[Web Search] Internet request detected."
+        )
+
+        if not WEB_SEARCH_AVAILABLE:
+
+            print(
+                "[Web Search] Module unavailable."
+            )
+
+            reply = (
+                "Sir, meri web search service "
+                "abhi available nahi hai."
+            )
+
+            speak_proxy(
+                reply
+            )
+
+            return reply
+
+        try:
+
+            web_query = build_web_query(
+                user_input
+            )
+
+            print(
+                "[Web Search] Query:",
+                web_query
+            )
+
+            search_results = web_search(
+                web_query,
+                max_results=5
+            )
+
+            if search_results:
+
+                print(
+                    "[Web Search] Search successful."
+                )
+
+                full_memory = build_memory_context()
+
+                web_prompt = build_web_ai_prompt(
+                    user_input,
+                    search_results,
+                    full_memory
+                )
+
+                print(
+                    "[Web Search] Sending results to AI..."
+                )
+
+                reply = get_ai_response(
+                    web_prompt,
+                    ""
+                )
+
+                if reply:
+
+                    reply = str(
+                        reply
+                    ).strip()
+
+                if reply:
+
+                    try:
+
+                        add_history(
+                            user_input,
+                            reply
+                        )
+
+                    except Exception as e:
+
+                        print(
+                            "History Error:",
+                            repr(e)
+                        )
+
+                    speak_proxy(
+                        reply
+                    )
+
+                    print(
+                        "Web AI Reply:",
+                        repr(reply)
+                    )
+
+                    print(
+                        "GUI ROUTER RETURN:",
+                        repr(reply)
+                    )
+
+                    return reply
+
+                print(
+                    "[Web Search] AI could not summarize results."
+                )
+
+            else:
+
+                print(
+                    "[Web Search] No results."
+                )
+
+                reply = (
+                    "Sir, mujhe is waqt internet par "
+                    "relevant information nahi mili."
+                )
+
+                speak_proxy(
+                    reply
+                )
+
+                return reply
+
+        except Exception as e:
+
+            print(
+                "[Web Search] Router Error:",
+                repr(e)
+            )
+
+            reply = (
+                "Sir, internet se information "
+                "lene mein filhaal problem aa gayi."
+            )
+
+            speak_proxy(
+                reply
+            )
+
+            return reply
+
+    # ======================================================
+    # COMMANDS
     # ======================================================
 
     try:
@@ -304,35 +974,53 @@ def route(user_input, speak=None):
             speak_proxy
         )
 
-        # Module ne direct reply return kiya
         if command_result:
 
             reply = str(
                 command_result
             ).strip()
 
-            speak_proxy(
+            if is_ai_error_message(
                 reply
-            )
+            ):
 
-            print(
-                "Command Reply:",
-                repr(reply)
-            )
+                print(
+                    "Command returned AI error."
+                )
 
-            return reply
+                captured_reply["text"] = None
 
-        # Module ne sirf speak() kiya
+            else:
+
+                if captured_reply["text"] != reply:
+
+                    speak_proxy(
+                        reply
+                    )
+
+                print(
+                    "Command Reply:",
+                    repr(reply)
+                )
+
+                return reply
+
         if captured_reply["text"]:
 
             reply = captured_reply["text"]
 
-            print(
-                "Captured Command Reply:",
-                repr(reply)
-            )
+            if not is_ai_error_message(
+                reply
+            ):
 
-            return reply
+                print(
+                    "Module Captured Reply:",
+                    repr(reply)
+                )
+
+                return reply
+
+            captured_reply["text"] = None
 
     except Exception as e:
 
@@ -342,7 +1030,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 8. SYSTEM
+    # SYSTEM
     # ======================================================
 
     try:
@@ -360,9 +1048,11 @@ def route(user_input, speak=None):
                 system_result
             ).strip()
 
-            speak_proxy(
-                reply
-            )
+            if captured_reply["text"] != reply:
+
+                speak_proxy(
+                    reply
+                )
 
             print(
                 "System Reply:",
@@ -373,14 +1063,7 @@ def route(user_input, speak=None):
 
         if captured_reply["text"]:
 
-            reply = captured_reply["text"]
-
-            print(
-                "Captured System Reply:",
-                repr(reply)
-            )
-
-            return reply
+            return captured_reply["text"]
 
     except Exception as e:
 
@@ -390,7 +1073,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 9. PROFILE
+    # PROFILE
     # ======================================================
 
     try:
@@ -408,9 +1091,11 @@ def route(user_input, speak=None):
                 profile_reply
             ).strip()
 
-            speak_proxy(
-                reply
-            )
+            if captured_reply["text"] != reply:
+
+                speak_proxy(
+                    reply
+                )
 
             print(
                 "Profile Reply:",
@@ -431,7 +1116,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 10. REMINDER
+    # REMINDER
     # ======================================================
 
     try:
@@ -449,9 +1134,11 @@ def route(user_input, speak=None):
                 reminder_reply
             ).strip()
 
-            speak_proxy(
-                reply
-            )
+            if captured_reply["text"] != reply:
+
+                speak_proxy(
+                    reply
+                )
 
             print(
                 "Reminder Reply:",
@@ -472,7 +1159,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 11. NOTES
+    # NOTES
     # ======================================================
 
     try:
@@ -490,9 +1177,11 @@ def route(user_input, speak=None):
                 notes_reply
             ).strip()
 
-            speak_proxy(
-                reply
-            )
+            if captured_reply["text"] != reply:
+
+                speak_proxy(
+                    reply
+                )
 
             print(
                 "Notes Reply:",
@@ -513,7 +1202,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 12. BRAIN
+    # BRAIN
     # ======================================================
 
     try:
@@ -528,16 +1217,20 @@ def route(user_input, speak=None):
                 brain_reply
             ).strip()
 
-            speak_proxy(
+            if not is_ai_error_message(
                 reply
-            )
+            ):
 
-            print(
-                "Brain Reply:",
-                repr(reply)
-            )
+                speak_proxy(
+                    reply
+                )
 
-            return reply
+                print(
+                    "Brain Reply:",
+                    repr(reply)
+                )
+
+                return reply
 
     except Exception as e:
 
@@ -547,7 +1240,7 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 13. THINKING
+    # THINKING
     # ======================================================
 
     try:
@@ -562,10 +1255,16 @@ def route(user_input, speak=None):
         )
 
     # ======================================================
-    # 14. AI FALLBACK
+    # MEMORY CONTEXT
     # ======================================================
 
+    full_memory = build_memory_context()
+
     memory_context = f"""
+Buddy Memory:
+
+{full_memory}
+
 Current Mood:
 {mood_name}
 
@@ -577,11 +1276,43 @@ Mood Style:
 
 Matched Mood Words:
 {matched_words}
+
+Important:
+Agar user apni saved information ke bare mein pooche
+to Buddy Memory ko use karo.
 """
+
+    # ======================================================
+    # AI MANAGER
+    # ======================================================
 
     try:
 
-        reply = ask_ai(
+        print(
+            "\n=========================================="
+        )
+
+        print(
+            "Buddy AI Manager Started"
+        )
+
+        print(
+            "Primary: Gemini"
+        )
+
+        print(
+            "Fallback Chain: APInex -> OpenCode Zen"
+        )
+
+        print(
+            "Memory Context: ENABLED"
+        )
+
+        print(
+            "=========================================="
+        )
+
+        reply = get_ai_response(
             user_input,
             memory_context
         )
@@ -589,14 +1320,14 @@ Matched Mood Words:
     except Exception as e:
 
         print(
-            "AI Router Error:",
+            "AI Manager Router Error:",
             repr(e)
         )
 
         reply = None
 
     # ======================================================
-    # 15. GUARANTEED AI FALLBACK
+    # FINAL AI FALLBACK
     # ======================================================
 
     if reply:
@@ -608,36 +1339,41 @@ Matched Mood Words:
     if not reply:
 
         reply = (
-            "Sir, main yahan hoon 😎 "
-            "Lekin AI service ne is waqt jawab nahi diya."
+            "Sir, is waqt meri AI services se "
+            "response nahi aa raha."
         )
 
     # ======================================================
-    # 16. PERSISTENT MEMORY
-    #
-    # Har message par Gemini call nahi.
-    # Sirf likely personal information.
+    # SAVE PERSONAL MEMORY
     # ======================================================
 
     memory_words = [
+
         "mera naam",
         "my name",
+
         "meri age",
         "meri umar",
+
         "mujhe pasand",
         "mujhe acha lagta",
         "mujhe achha lagta",
+
         "mera favourite",
         "meri favourite",
         "mera favorite",
         "meri favorite",
+
         "mera shehar",
         "main rehta",
         "main rehti",
+
         "mera goal",
         "mera dream",
+
         "mera phone",
         "meri hobby",
+
         "mera favourite game",
         "mera favorite game"
     ]
@@ -670,16 +1406,13 @@ Matched Mood Words:
 
         except Exception as e:
 
-            # Memory fail hone se Buddy ka main reply
-            # kabhi block nahi hoga.
-
             print(
                 "Memory Save Skipped:",
                 repr(e)
             )
 
     # ======================================================
-    # 17. CONVERSATION HISTORY
+    # HISTORY
     # ======================================================
 
     try:
@@ -697,19 +1430,7 @@ Matched Mood Words:
         )
 
     # ======================================================
-    # 18. FINAL REPLY
-    # ======================================================
-
-    print(
-        "Buddy Final Reply:",
-        repr(reply)
-    )
-
-    # ======================================================
-    # IMPORTANT
-    #
-    # Voice sirf yahan se.
-    # AI/Memory ke baad duplicate speak nahi.
+    # FINAL VOICE
     # ======================================================
 
     speak_proxy(
@@ -717,16 +1438,39 @@ Matched Mood Words:
     )
 
     # ======================================================
-    # GUI KO REPLY RETURN
+    # FINAL GUI REPLY
     # ======================================================
+
+    print(
+        "Buddy Final Reply:",
+        repr(reply)
+    )
+
+    print(
+        "GUI ROUTER RETURN:",
+        repr(reply)
+    )
 
     return reply
 
 
 # ==========================================================
-# Router Ready
+# ROUTER READY
 # ==========================================================
 
 print(
-    "Buddy AI Router 3.0 Loaded"
+    "Buddy AI Router 3.5 Loaded"
+)
+
+print(
+    "AI Chain: Memory -> Web Search -> Gemini -> APInex -> OpenCode Zen"
+)
+
+print(
+    "Persistent Memory: ENABLED"
+)
+
+print(
+    "Web Search:",
+    "ENABLED" if WEB_SEARCH_AVAILABLE else "DISABLED"
 )

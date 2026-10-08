@@ -21,7 +21,6 @@ MEMORY_FILE = os.path.join(
 # ----------------------------------------
 
 def load_memory():
-
     if not os.path.exists(MEMORY_FILE):
         return {}
 
@@ -39,7 +38,6 @@ def load_memory():
 # ----------------------------------------
 
 def save_memory(memory):
-
     try:
         with open(MEMORY_FILE, "w", encoding="utf-8") as file:
             json.dump(
@@ -57,84 +55,105 @@ def save_memory(memory):
 
 
 # ----------------------------------------
+# Parse Reminder Date/Time
+# ----------------------------------------
+
+def parse_reminder_datetime(date_value, time_value):
+    """
+    Supports:
+    YYYY-MM-DD HH:MM AM/PM
+    YYYY-MM-DD HH:MM
+    """
+
+    if not date_value or not time_value:
+        return None
+
+    date_value = str(date_value).strip()
+    time_value = str(time_value).strip()
+
+    formats = [
+        "%Y-%m-%d %I:%M %p",
+        "%Y-%m-%d %I:%M:%S %p",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.datetime.strptime(
+                f"{date_value} {time_value}",
+                fmt
+            )
+        except ValueError:
+            continue
+
+    return None
+
+
+# ----------------------------------------
 # Check Reminders
 # ----------------------------------------
 
 def check_reminders(speak):
 
     memory = load_memory()
-
     reminders = memory.get("reminders", [])
 
     now = datetime.datetime.now()
 
-    print(
-        f"🕐 Scheduler Check: "
-        f"{now.strftime('%Y-%m-%d %I:%M:%S %p')}"
-    )
-
-    if not reminders:
-        print("📭 No reminders found.")
+    if not isinstance(reminders, list):
         return
 
     changed = False
 
     for reminder in reminders:
 
-        print(
-            f"📌 Reminder: "
-            f"{reminder.get('task')} | "
-            f"{reminder.get('date')} | "
-            f"{reminder.get('time')} | "
-            f"Completed: {reminder.get('completed')}"
-        )
+        if not isinstance(reminder, dict):
+            continue
 
+        # Completed reminders ko ignore karo
         if reminder.get("completed", False):
             continue
+
+        task = str(
+            reminder.get("task", "aapka reminder")
+        ).strip()
 
         reminder_date = reminder.get("date", "")
         reminder_time = reminder.get("time", "")
 
+        # Incomplete reminder ko ignore karo
         if not reminder_date or not reminder_time:
             continue
 
-        try:
-
-            reminder_datetime = datetime.datetime.strptime(
-                f"{reminder_date} {reminder_time}",
-                "%Y-%m-%d %I:%M %p"
-            )
-
-        except ValueError as e:
-
-            print("❌ Date/Time Parse Error:", e)
-            continue
-
-        print(
-            f"🎯 Target: "
-            f"{reminder_datetime.strftime('%Y-%m-%d %I:%M:%S %p')}"
+        reminder_datetime = parse_reminder_datetime(
+            reminder_date,
+            reminder_time
         )
 
+        # Invalid date/time ko ignore karo
+        if reminder_datetime is None:
+            continue
+
+        # Reminder ka waqt aa gaya
         if now >= reminder_datetime:
 
-            task = reminder.get(
-                "task",
-                "aapka reminder"
-            )
+            print(f"\n🔔 REMINDER: {task}")
 
-            print(f"\n🔔 REMINDER TRIGGERED: {task}")
-
-            speak(
-                f"Sir, reminder! "
-                f"{task} ka waqt ho gaya hai."
-            )
+            try:
+                speak(
+                    f"Sir, reminder! "
+                    f"{task} ka waqt ho gaya hai."
+                )
+            except Exception as e:
+                print("Reminder Voice Error:", e)
 
             reminder["completed"] = True
             changed = True
 
     if changed:
         save_memory(memory)
-        print("✅ Reminder marked completed.")
+
 
 # ----------------------------------------
 # Background Scheduler
@@ -147,11 +166,9 @@ def reminder_loop(speak):
     while True:
 
         try:
-
             check_reminders(speak)
 
         except Exception as e:
-
             print("Scheduler Error:", e)
 
         # Har 20 seconds mein check

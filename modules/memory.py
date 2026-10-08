@@ -193,6 +193,7 @@ def get_all_memory():
 
     return load_memory()
 
+
 # ==========================================
 # Save Extracted Memory
 # ==========================================
@@ -211,23 +212,72 @@ def save_extracted_memory(data):
 
     return save_memory(memory)
 
+
+# ==========================================
+# Search Memory
+# ==========================================
+
 def search_memory(query):
+
     memory = get_all_memory()
 
-    query = query.lower()
+    if not isinstance(query, str):
+        return {}
+
+    query = query.lower().strip()
 
     results = {}
 
     keywords = {
-        "phone": ["phone", "mobile", "samsung", "iphone"],
-        "game": ["game", "gaming", "khel"],
-        "food": ["food", "khana", "biryani"],
-        "car": ["car", "gaari", "hilux"],
-        "ai": ["ai", "artificial intelligence"],
-        "youtuber": ["youtube", "youtuber"],
-        "hobby": ["hobby", "shoq"],
-        "dream": ["dream", "khwab"],
-        "goal": ["goal", "maqsad"]
+        "phone": [
+            "phone",
+            "mobile",
+            "samsung",
+            "iphone"
+        ],
+
+        "game": [
+            "game",
+            "gaming",
+            "khel"
+        ],
+
+        "food": [
+            "food",
+            "khana",
+            "biryani"
+        ],
+
+        "car": [
+            "car",
+            "gaari",
+            "hilux"
+        ],
+
+        "ai": [
+            "ai",
+            "artificial intelligence"
+        ],
+
+        "youtuber": [
+            "youtube",
+            "youtuber"
+        ],
+
+        "hobby": [
+            "hobby",
+            "shoq"
+        ],
+
+        "dream": [
+            "dream",
+            "khwab"
+        ],
+
+        "goal": [
+            "goal",
+            "maqsad"
+        ]
     }
 
     for memory_key, words in keywords.items():
@@ -237,38 +287,59 @@ def search_memory(query):
             if word in query:
 
                 if memory_key == "phone":
+
                     if "favorite_phone" in memory:
-                        results["favorite_phone"] = memory["favorite_phone"]
+                        results["favorite_phone"] = (
+                            memory["favorite_phone"]
+                        )
 
                 elif memory_key == "game":
+
                     if "favorite_game" in memory:
-                        results["favorite_game"] = memory["favorite_game"]
+                        results["favorite_game"] = (
+                            memory["favorite_game"]
+                        )
 
                 elif memory_key == "food":
+
                     if "favorite_food" in memory:
-                        results["favorite_food"] = memory["favorite_food"]
+                        results["favorite_food"] = (
+                            memory["favorite_food"]
+                        )
 
                 elif memory_key == "car":
+
                     if "favorite_car" in memory:
-                        results["favorite_car"] = memory["favorite_car"]
+                        results["favorite_car"] = (
+                            memory["favorite_car"]
+                        )
 
                 elif memory_key == "ai":
+
                     if "favorite_ai" in memory:
-                        results["favorite_ai"] = memory["favorite_ai"]
+                        results["favorite_ai"] = (
+                            memory["favorite_ai"]
+                        )
 
                 elif memory_key == "youtuber":
+
                     if "favorite_youtuber" in memory:
-                        results["favorite_youtuber"] = memory["favorite_youtuber"]
+                        results["favorite_youtuber"] = (
+                            memory["favorite_youtuber"]
+                        )
 
                 elif memory_key == "hobby":
+
                     if "hobby" in memory:
                         results["hobby"] = memory["hobby"]
 
                 elif memory_key == "dream":
+
                     if "dream" in memory:
                         results["dream"] = memory["dream"]
 
                 elif memory_key == "goal":
+
                     if "goal" in memory:
                         results["goal"] = memory["goal"]
 

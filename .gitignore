@@ -1,27 +1,78 @@
+# ==========================================================
+# Buddy AI - Git Ignore
+# ==========================================================
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
+*$py.class
 
-# Environment / Secrets
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
 .env
 .env.*
 !.env.example
 
-# BuddyAI private data
+# API keys / secrets
+*.key
+*.pem
+secrets.json
+credentials.json
+
+# Buddy personal data
 data/memory.json
-data/*.json
+data/history.json
+data/profile.json
+data/reminders.json
+data/notes.json
+data/settings.json
+
+# Generated audio
+*.mp3
+*.wav
+*.ogg
+
+# Temporary files
+*.tmp
+*.temp
 *.log
 
-# Virtual environments
-venv/
-.venv/
-env/
+# Test files
+test.mp3
+test.wav
 
 # IDE
 .vscode/
 .idea/
 
-# OS
-Thumbs.db
+# Operating system
 .DS_Store
+Thumbs.db
+
+# Python tools
+.pytest_cache/
+.mypy_cache/
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+
+# Backup files
+*.bak
+*.backup
+# Personal Buddy data
+data/*.json
+
+# Backup / experimental files
+*_backup.py
+deepseek4free/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc

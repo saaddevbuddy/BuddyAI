@@ -1,1057 +1,615 @@
 # ==========================================================
-# Buddy AI - Desktop Companion GUI
-# Login + Living Companion Edition
+# Buddy AI - Modern Pro Dark GUI
+# Voice + Sound Control + Avatar + Mood + Proactive Mode
 # ==========================================================
 
-import tkinter as tk
-from tkinter import scrolledtext, messagebox
+import os
 import threading
 import datetime
 import time
+import tkinter as tk
+
+
+# ==========================================================
+# Buddy Modules
+# ==========================================================
 
 from modules.router import route
 from voice import speak as real_speak
 from voice import listen
-
 from modules.buddy_mood import get_buddy_mood
 
 from modules.proactive import (
     start_proactive,
     stop_proactive,
-    register_activity,
     set_proactive_callback
 )
 
-from modules.login_system import (
-    account_exists,
-    create_account,
-    verify_login,
-    should_auto_login,
-    logout,
-    get_user_name
+
+# ==========================================================
+# Pillow
+# ==========================================================
+
+try:
+
+    from PIL import Image, ImageTk
+
+    PIL_AVAILABLE = True
+
+except ImportError:
+
+    PIL_AVAILABLE = False
+
+    print("[Avatar] Pillow is not installed.")
+
+
+# ==========================================================
+# GLOBALS
+# ==========================================================
+
+root = None
+
+chat_box = None
+entry_box = None
+
+avatar_label = None
+sidebar_avatar_label = None
+
+status_label = None
+clock_label = None
+uptime_label = None
+
+sound_button = None
+
+avatar_images = {}
+sidebar_avatar_images = {}
+
+current_avatar_state = "idle"
+
+avatar_animation_job = None
+
+avatar_bob_offset = 0
+avatar_bob_direction = 1
+
+start_time = time.time()
+
+sound_enabled = True
+
+speaking_active = False
+
+
+# ==========================================================
+# BASE DIRECTORY
+# ==========================================================
+
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
 )
 
 
 # ==========================================================
-# ROOT
+# AVATAR FOLDER
 # ==========================================================
 
-root = tk.Tk()
-
-root.title("Buddy AI")
-
-root.configure(
-    bg="#EEF6FF"
+AVATAR_FOLDER = os.path.join(
+    BASE_DIR,
+    "assets",
+    "avatar"
 )
 
-root.attributes(
-    "-topmost",
-    True
-)
+
+# ==========================================================
+# AVATAR FILES
+# ==========================================================
+
+AVATAR_FILES = {
+
+    "idle": "buddy_idle.png.jpg",
+
+    "listening": "buddy_listening.png.jpg",
+
+    "thinking": "buddy_thinking.png.jpg",
+
+    "speaking": "buddy_speaking.png.jpg",
+
+    "happy": "buddy_happy.png.jpg",
+
+    "concerned": "buddy_concerned.png.jpg"
+}
 
 
 # ==========================================================
 # COLORS
 # ==========================================================
 
-BG = "#EEF6FF"
-TOP = "#D7E9FA"
+BG_COLOR = "#08111F"
 
-WHITE = "#FFFFFF"
-CHAT = "#F8FBFF"
+SIDEBAR_COLOR = "#0D1726"
 
-TEXT = "#243447"
-MUTED = "#718096"
+CARD_COLOR = "#111E30"
 
-BLUE = "#4A90E2"
-BLUE_HOVER = "#357ABD"
+CARD_LIGHT = "#16263B"
 
-GREEN = "#22A06B"
-GREEN_BG = "#E3F8EE"
+TEXT_COLOR = "#EAF4FF"
 
-PURPLE = "#7C5CFC"
+SECONDARY_TEXT = "#91A4BB"
 
-PINK = "#E96B8A"
-PINK_BG = "#FDEBF0"
+BLUE = "#2196F3"
 
-BORDER = "#CFE0F0"
+BLUE_LIGHT = "#42A5F5"
 
-DARK_BLUE = "#245B8F"
+GREEN = "#35D07F"
+
+YELLOW = "#FFD166"
+
+RED = "#FF647C"
 
 
 # ==========================================================
-# GLOBAL STATE
+# SAFE TKINTER CALLBACK
 # ==========================================================
 
-processing = False
-
-voice_processing = False
-
-proactive_enabled = True
-
-is_maximized = False
-
-normal_geometry = None
-
-drag_x = 0
-drag_y = 0
-
-last_gui_reply = ""
-last_gui_reply_time = 0
-
-buddy_started_at = time.time()
-
-
-# ==========================================================
-# WINDOW SIZE
-# ==========================================================
-
-WIDTH = 470
-HEIGHT = 850
-
-
-# ==========================================================
-# WINDOW MOVEMENT
-# ==========================================================
-
-def start_drag(event):
-
-    global drag_x
-    global drag_y
-
-    if not is_maximized:
-
-        drag_x = (
-            event.x_root -
-            root.winfo_x()
-        )
-
-        drag_y = (
-            event.y_root -
-            root.winfo_y()
-        )
-
-
-def drag_window(event):
-
-    if not is_maximized:
-
-        new_x = (
-            event.x_root -
-            drag_x
-        )
-
-        new_y = (
-            event.y_root -
-            drag_y
-        )
-
-        root.geometry(
-            f"{root.winfo_width()}x"
-            f"{root.winfo_height()}+"
-            f"{new_x}+"
-            f"{new_y}"
-        )
-
-
-# ==========================================================
-# WINDOW CONTROLS
-# ==========================================================
-
-def minimize_buddy():
-
-    root.iconify()
-
-
-def toggle_maximize():
-
-    global is_maximized
-    global normal_geometry
-
-    if not is_maximized:
-
-        normal_geometry = root.geometry()
-
-        root.geometry(
-            f"{root.winfo_screenwidth()}x"
-            f"{root.winfo_screenheight()}+0+0"
-        )
-
-        maximize_button.config(
-            text="❐"
-        )
-
-        is_maximized = True
-
-    else:
-
-        if normal_geometry:
-
-            root.geometry(
-                normal_geometry
-            )
-
-        maximize_button.config(
-            text="□"
-        )
-
-        is_maximized = False
-
-
-# ==========================================================
-# CLOSE
-# ==========================================================
-
-def close_buddy():
+def safe_after(delay, callback):
 
     try:
 
-        stop_proactive()
+        if (
+            root is not None
+            and root.winfo_exists()
+        ):
+
+            return root.after(
+                delay,
+                callback
+            )
 
     except Exception:
+
         pass
 
-    root.destroy()
+    return None
 
 
 # ==========================================================
-# LOGIN VARIABLES
+# SOUND CONTROL
 # ==========================================================
 
-login_frame = None
+def toggle_sound():
 
-login_username = None
-login_password = None
+    global sound_enabled
 
-create_name = None
-create_username = None
-create_password = None
-create_confirm = None
+    sound_enabled = not sound_enabled
 
+    update_sound_button()
 
-# ==========================================================
-# LOGIN SCREEN
-# ==========================================================
+    if sound_enabled:
 
-def clear_root():
+        print("[Sound] ON")
 
-    for widget in root.winfo_children():
+        if status_label is not None:
 
-        widget.destroy()
+            status_label.configure(
+                text="● Sound ON",
+                fg=GREEN
+            )
 
-
-# ==========================================================
-# LOGIN TITLE
-# ==========================================================
-
-def create_login_screen():
-
-    global login_frame
-    global login_username
-    global login_password
-
-    clear_root()
-
-    root.geometry(
-        "430x620"
-    )
-
-    root.resizable(
-        False,
-        False
-    )
-
-    root.attributes(
-        "-topmost",
-        True
-    )
-
-    login_frame = tk.Frame(
-        root,
-        bg=BG
-    )
-
-    login_frame.pack(
-        fill="both",
-        expand=True
-    )
-
-    # ------------------------------------------------------
-    # Avatar
-    # ------------------------------------------------------
-
-    tk.Label(
-        login_frame,
-        text="🤖",
-        font=(
-            "Segoe UI Emoji",
-            70
-        ),
-        bg=BG
-    ).pack(
-        pady=(35, 5)
-    )
-
-    tk.Label(
-        login_frame,
-        text="Buddy AI",
-        font=(
-            "Segoe UI",
-            24,
-            "bold"
-        ),
-        bg=BG,
-        fg=TEXT
-    ).pack()
-
-    tk.Label(
-        login_frame,
-        text="Welcome back, Sir ❤️",
-        font=(
-            "Segoe UI",
-            11
-        ),
-        bg=BG,
-        fg=MUTED
-    ).pack(
-        pady=(3, 25)
-    )
-
-    # ------------------------------------------------------
-    # Username
-    # ------------------------------------------------------
-
-    tk.Label(
-        login_frame,
-        text="👤 Username",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=BG,
-        fg=TEXT
-    ).pack(
-        anchor="w",
-        padx=45
-    )
-
-    login_username = tk.Entry(
-        login_frame,
-        font=(
-            "Segoe UI",
-            11
-        ),
-        bg=WHITE,
-        fg=TEXT,
-        bd=0,
-        relief="flat",
-        highlightthickness=1,
-        highlightbackground=BORDER,
-        highlightcolor=BLUE
-    )
-
-    login_username.pack(
-        fill="x",
-        padx=45,
-        ipady=10,
-        pady=(4, 15)
-    )
-
-    # ------------------------------------------------------
-    # Password
-    # ------------------------------------------------------
-
-    tk.Label(
-        login_frame,
-        text="🔑 Password",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=BG,
-        fg=TEXT
-    ).pack(
-        anchor="w",
-        padx=45
-    )
-
-    login_password = tk.Entry(
-        login_frame,
-        font=(
-            "Segoe UI",
-            11
-        ),
-        bg=WHITE,
-        fg=TEXT,
-        bd=0,
-        relief="flat",
-        show="●",
-        highlightthickness=1,
-        highlightbackground=BORDER,
-        highlightcolor=BLUE
-    )
-
-    login_password.pack(
-        fill="x",
-        padx=45,
-        ipady=10,
-        pady=(4, 22)
-    )
-
-    # ------------------------------------------------------
-    # Login Button
-    # ------------------------------------------------------
-
-    tk.Button(
-        login_frame,
-        text="🔐  LOGIN",
-        font=(
-            "Segoe UI",
-            11,
-            "bold"
-        ),
-        bg=BLUE,
-        fg="white",
-        activebackground=BLUE_HOVER,
-        activeforeground="white",
-        bd=0,
-        padx=30,
-        pady=11,
-        cursor="hand2",
-        command=perform_login
-    ).pack(
-        fill="x",
-        padx=45
-    )
-
-    # ------------------------------------------------------
-    # Create Account
-    # ------------------------------------------------------
-
-    tk.Button(
-        login_frame,
-        text="✨ Create New Buddy Account",
-        font=(
-            "Segoe UI",
-            10,
-            "bold"
-        ),
-        bg=BG,
-        fg=PURPLE,
-        activebackground=BG,
-        activeforeground=BLUE,
-        bd=0,
-        cursor="hand2",
-        command=create_account_screen
-    ).pack(
-        pady=20
-    )
-
-    tk.Label(
-        login_frame,
-        text="🔒 Your Buddy account stays on this PC.",
-        font=(
-            "Segoe UI",
-            8
-        ),
-        bg=BG,
-        fg=MUTED
-    ).pack(
-        pady=5
-    )
-
-    login_username.focus_set()
-
-    login_password.bind(
-        "<Return>",
-        lambda event: perform_login()
-    )
-
-
-# ==========================================================
-# CREATE ACCOUNT SCREEN
-# ==========================================================
-
-def create_account_screen():
-
-    global create_name
-    global create_username
-    global create_password
-    global create_confirm
-
-    clear_root()
-
-    root.geometry(
-        "430x720"
-    )
-
-    root.resizable(
-        False,
-        False
-    )
-
-    frame = tk.Frame(
-        root,
-        bg=BG
-    )
-
-    frame.pack(
-        fill="both",
-        expand=True
-    )
-
-    tk.Label(
-        frame,
-        text="🤖",
-        font=(
-            "Segoe UI Emoji",
-            55
-        ),
-        bg=BG
-    ).pack(
-        pady=(20, 0)
-    )
-
-    tk.Label(
-        frame,
-        text="Create Buddy Account",
-        font=(
-            "Segoe UI",
-            21,
-            "bold"
-        ),
-        bg=BG,
-        fg=TEXT
-    ).pack()
-
-    tk.Label(
-        frame,
-        text="Sir, pehli dafa Buddy setup karte hain ❤️",
-        font=(
-            "Segoe UI",
-            10
-        ),
-        bg=BG,
-        fg=MUTED
-    ).pack(
-        pady=(3, 20)
-    )
-
-    # ------------------------------------------------------
-    # FIELD HELPER
-    # ------------------------------------------------------
-
-    def field(
-        title,
-        show=None
-    ):
-
-        tk.Label(
-            frame,
-            text=title,
-            font=(
-                "Segoe UI",
-                9,
-                "bold"
-            ),
-            bg=BG,
-            fg=TEXT
-        ).pack(
-            anchor="w",
-            padx=45
-        )
-
-        entry = tk.Entry(
-            frame,
-            font=(
-                "Segoe UI",
-                10
-            ),
-            bg=WHITE,
-            fg=TEXT,
-            bd=0,
-            relief="flat",
-            highlightthickness=1,
-            highlightbackground=BORDER,
-            highlightcolor=BLUE,
-            show=show if show else ""
-        )
-
-        entry.pack(
-            fill="x",
-            padx=45,
-            ipady=9,
-            pady=(4, 12)
-        )
-
-        return entry
-
-    # ------------------------------------------------------
-    # Fields
-    # ------------------------------------------------------
-
-    create_name = field(
-        "👤 Your Name"
-    )
-
-    create_username = field(
-        "🪪 Username"
-    )
-
-    create_password = field(
-        "🔑 Password",
-        "●"
-    )
-
-    create_confirm = field(
-        "🔐 Confirm Password",
-        "●"
-    )
-
-    # ------------------------------------------------------
-    # Create Button
-    # ------------------------------------------------------
-
-    tk.Button(
-        frame,
-        text="✨  CREATE ACCOUNT",
-        font=(
-            "Segoe UI",
-            10,
-            "bold"
-        ),
-        bg=BLUE,
-        fg="white",
-        activebackground=BLUE_HOVER,
-        activeforeground="white",
-        bd=0,
-        padx=25,
-        pady=11,
-        cursor="hand2",
-        command=perform_create_account
-    ).pack(
-        fill="x",
-        padx=45,
-        pady=(8, 10)
-    )
-
-    # ------------------------------------------------------
-    # Back
-    # ------------------------------------------------------
-
-    tk.Button(
-        frame,
-        text="← Back to Login",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=BG,
-        fg=MUTED,
-        activebackground=BG,
-        activeforeground=TEXT,
-        bd=0,
-        cursor="hand2",
-        command=create_login_screen
-    ).pack()
-
-    create_name.focus_set()
-
-
-# ==========================================================
-# CREATE ACCOUNT
-# ==========================================================
-
-def perform_create_account():
-
-    name = create_name.get().strip()
-    username = create_username.get().strip()
-    password = create_password.get()
-    confirm = create_confirm.get()
-
-    if not name:
-
-        messagebox.showwarning(
-            "Buddy AI",
-            "Sir, apna naam enter karein."
-        )
-
-        create_name.focus_set()
-
-        return
-
-    if not username:
-
-        messagebox.showwarning(
-            "Buddy AI",
-            "Username enter karein."
-        )
-
-        create_username.focus_set()
-
-        return
-
-    if not password:
-
-        messagebox.showwarning(
-            "Buddy AI",
-            "Password enter karein."
-        )
-
-        create_password.focus_set()
-
-        return
-
-    if password != confirm:
-
-        messagebox.showerror(
-            "Buddy AI",
-            "Dono passwords same nahi hain."
-        )
-
-        create_confirm.focus_set()
-
-        return
-
-    success, message = create_account(
-        name,
-        username,
-        password
-    )
-
-    if success:
-
-        messagebox.showinfo(
-            "Buddy AI",
-            "Account create ho gaya! 🎉\n\n"
-            "Welcome to Buddy AI, "
-            + name
-            + " ❤️"
-        )
-
-        open_buddy_gui()
+            safe_after(
+                1200,
+                update_status_online
+            )
 
     else:
 
-        messagebox.showerror(
-            "Buddy AI",
-            message
-        )
+        print("[Sound] OFF")
+
+        if status_label is not None:
+
+            status_label.configure(
+                text="● Sound OFF",
+                fg=YELLOW
+            )
 
 
 # ==========================================================
-# LOGIN
+# SOUND BUTTON
 # ==========================================================
 
-def perform_login():
+def update_sound_button():
 
-    username = login_username.get().strip()
-    password = login_password.get()
-
-    if not username:
-
-        messagebox.showwarning(
-            "Buddy AI",
-            "Username enter karein."
-        )
+    if sound_button is None:
 
         return
 
-    if not password:
+    try:
 
-        messagebox.showwarning(
-            "Buddy AI",
-            "Password enter karein."
+        if sound_enabled:
+
+            sound_button.configure(
+                text="🔊 Sound ON",
+                fg=GREEN
+            )
+
+        else:
+
+            sound_button.configure(
+                text="🔇 Sound OFF",
+                fg=YELLOW
+            )
+
+    except Exception:
+
+        pass
+
+
+# ==========================================================
+# STOP SPEAKING
+# ==========================================================
+
+def stop_speaking():
+
+    global speaking_active
+
+    print("[Voice] Stop requested.")
+
+    speaking_active = False
+
+    try:
+
+        import pygame
+
+        if pygame.mixer.get_init():
+
+            pygame.mixer.music.stop()
+
+    except Exception as e:
+
+        print(
+            "[Voice] Stop Error:",
+            repr(e)
         )
+
+    set_avatar_state("idle")
+
+    update_status_online()
+
+
+# ==========================================================
+# CLEAR CHAT
+# ==========================================================
+
+def clear_chat():
+
+    if chat_box is None:
 
         return
 
-    success, message = verify_login(
-        username,
-        password
-    )
+    try:
 
-    if success:
-
-        open_buddy_gui()
-
-    else:
-
-        messagebox.showerror(
-            "Login Failed",
-            message
+        chat_box.configure(
+            state="normal"
         )
 
-        login_password.delete(
-            0,
+        chat_box.delete(
+            "1.0",
             tk.END
         )
 
-        login_password.focus_set()
+        chat_box.configure(
+            state="disabled"
+        )
+
+        add_chat_message(
+            "Buddy",
+            "Chat clear ho gayi Sir. Main ready hoon.",
+            is_user=False
+        )
+
+        set_avatar_state(
+            "idle"
+        )
+
+        update_status_online()
+
+        print("[Chat] Chat cleared.")
+
+    except Exception as e:
+
+        print(
+            "[Chat] Clear Error:",
+            repr(e)
+        )
 
 
 # ==========================================================
-# LOGOUT
+# LOAD AVATAR IMAGES
 # ==========================================================
 
-def perform_logout():
+def load_avatar_images():
 
-    global proactive_enabled
+    global avatar_images
+    global sidebar_avatar_images
 
-    answer = messagebox.askyesno(
-        "Logout",
-        "Sir, kya aap Buddy se logout karna chahte hain?"
-    )
+    avatar_images = {}
+    sidebar_avatar_images = {}
 
-    if not answer:
+    if not PIL_AVAILABLE:
+
+        print("[Avatar] Pillow missing.")
 
         return
 
-    proactive_enabled = False
+    if not os.path.isdir(
+        AVATAR_FOLDER
+    ):
 
-    try:
-
-        stop_proactive()
-
-    except Exception:
-        pass
-
-    logout()
-
-    create_login_screen()
-
-
-# ==========================================================
-# GUI HELPERS
-# ==========================================================
-
-def update_status(
-    text,
-    emoji="🟢"
-):
-
-    root.after(
-        0,
-        lambda: status_label.config(
-            text=f"{emoji} {text}"
-        )
-    )
-
-
-def set_mood(text):
-
-    root.after(
-        0,
-        lambda: mood_label.config(
-            text=text
-        )
-    )
-
-
-# ==========================================================
-# CLOCK
-# ==========================================================
-
-def update_clock():
-
-    current_time = datetime.datetime.now().strftime(
-        "%I:%M:%S %p"
-    )
-
-    clock_label.config(
-        text=f"🕐 {current_time}"
-    )
-
-    root.after(
-        1000,
-        update_clock
-    )
-
-
-# ==========================================================
-# UPTIME
-# ==========================================================
-
-def update_uptime():
-
-    elapsed = int(
-        time.time()
-        -
-        buddy_started_at
-    )
-
-    hours = elapsed // 3600
-
-    minutes = (
-        elapsed % 3600
-    ) // 60
-
-    seconds = (
-        elapsed % 60
-    )
-
-    uptime_label.config(
-        text=(
-            f"⚡ Online "
-            f"{hours:02d}:"
-            f"{minutes:02d}:"
-            f"{seconds:02d}"
-        )
-    )
-
-    root.after(
-        1000,
-        update_uptime
-    )
-
-
-# ==========================================================
-# BIRTHDAY
-# ==========================================================
-
-def update_birthday():
-
-    now = datetime.datetime.now()
-
-    birthday = datetime.datetime(
-        now.year,
-        8,
-        24,
-        0,
-        0,
-        0
-    )
-
-    if now >= birthday:
-
-        birthday = datetime.datetime(
-            now.year + 1,
-            8,
-            24,
-            0,
-            0,
-            0
+        print(
+            "[Avatar] Folder missing:",
+            AVATAR_FOLDER
         )
 
-    remaining = birthday - now
+        return
 
-    days = remaining.days
+    for state, filename in AVATAR_FILES.items():
 
-    hours = (
-        remaining.seconds // 3600
-    )
-
-    minutes = (
-        remaining.seconds % 3600
-    ) // 60
-
-    if days == 0:
-
-        birthday_label.config(
-            text="🎂 HAPPY BIRTHDAY SIR! 🎉"
+        path = os.path.join(
+            AVATAR_FOLDER,
+            filename
         )
 
-    elif days <= 7:
+        if not os.path.exists(path):
 
-        birthday_label.config(
-            text=(
-                f"🔥 Birthday incoming! "
-                f"{days}d {hours}h {minutes}m"
+            print(
+                "[Avatar] Missing:",
+                path
             )
-        )
 
-    else:
-
-        birthday_label.config(
-            text=(
-                f"🎁 Birthday Countdown: "
-                f"{days}d {hours}h {minutes}m"
-            )
-        )
-
-    root.after(
-        30000,
-        update_birthday
-    )
-
-
-# ==========================================================
-# CHAT
-# ==========================================================
-
-def add_chat(
-    sender,
-    message
-):
-
-    if message is None:
-        return
-
-    message = str(
-        message
-    ).strip()
-
-    if not message:
-        return
-
-    def write():
+            continue
 
         try:
 
-            chat_box.config(
-                state="normal"
+            image = Image.open(
+                path
             )
 
-            chat_box.insert(
-                tk.END,
-                f"{sender}: {message}\n\n"
+            image = image.convert(
+                "RGB"
             )
 
-            chat_box.config(
-                state="disabled"
+            image.thumbnail(
+                (
+                    220,
+                    220
+                ),
+                Image.Resampling.LANCZOS
             )
 
-            chat_box.see(
-                tk.END
+            avatar_images[state] = (
+                ImageTk.PhotoImage(
+                    image
+                )
+            )
+
+            sidebar_image = Image.open(
+                path
+            )
+
+            sidebar_image = sidebar_image.convert(
+                "RGB"
+            )
+
+            sidebar_image.thumbnail(
+                (
+                    125,
+                    125
+                ),
+                Image.Resampling.LANCZOS
+            )
+
+            sidebar_avatar_images[state] = (
+                ImageTk.PhotoImage(
+                    sidebar_image
+                )
+            )
+
+            print(
+                "[Avatar] Loaded:",
+                state,
+                filename
             )
 
         except Exception as e:
 
             print(
-                "Chat Write Error:",
+                "[Avatar] Load Error:",
+                filename,
                 repr(e)
             )
 
-    root.after(
-        0,
-        write
-    )
-
 
 # ==========================================================
-# SPEAK
+# SET AVATAR STATE
 # ==========================================================
 
-def speak_async(text):
+def set_avatar_state(state):
 
-    if not text:
-        return
+    global current_avatar_state
+
+    if state not in AVATAR_FILES:
+
+        state = "idle"
+
+    current_avatar_state = state
 
     try:
 
-        threading.Thread(
-            target=real_speak,
-            args=(text,),
-            daemon=True
-        ).start()
+        if (
+            avatar_label is not None
+            and state in avatar_images
+        ):
+
+            avatar_label.configure(
+                image=avatar_images[state]
+            )
+
+        if (
+            sidebar_avatar_label is not None
+            and state in sidebar_avatar_images
+        ):
+
+            sidebar_avatar_label.configure(
+                image=sidebar_avatar_images[state]
+            )
 
     except Exception as e:
 
         print(
-            "Speech Error:",
+            "[Avatar] State Error:",
+            repr(e)
+        )
+
+
+# ==========================================================
+# AVATAR ANIMATION
+# ==========================================================
+
+def avatar_breathing_animation():
+
+    global avatar_animation_job
+    global avatar_bob_offset
+    global avatar_bob_direction
+
+    try:
+
+        if (
+            root is None
+            or not root.winfo_exists()
+            or avatar_label is None
+        ):
+
+            return
+
+        if current_avatar_state == "speaking":
+
+            speed = 1.0
+            min_offset = -4
+            max_offset = 5
+            next_delay = 55
+
+        elif current_avatar_state == "listening":
+
+            speed = 0.65
+            min_offset = -3
+            max_offset = 3
+            next_delay = 75
+
+        elif current_avatar_state == "thinking":
+
+            speed = 0.45
+            min_offset = -2
+            max_offset = 2
+            next_delay = 90
+
+        else:
+
+            speed = 0.30
+            min_offset = -2
+            max_offset = 3
+            next_delay = 100
+
+        avatar_bob_offset += (
+            speed
+            * avatar_bob_direction
+        )
+
+        if avatar_bob_offset >= max_offset:
+
+            avatar_bob_direction = -1
+
+        elif avatar_bob_offset <= min_offset:
+
+            avatar_bob_direction = 1
+
+        avatar_label.place_configure(
+            y=int(
+                avatar_bob_offset
+            )
+        )
+
+        avatar_animation_job = root.after(
+            next_delay,
+            avatar_breathing_animation
+        )
+
+    except Exception as e:
+
+        print(
+            "[Avatar Animation Error]:",
+            repr(e)
+        )
+
+        avatar_animation_job = None
+
+
+# ==========================================================
+# CHAT MESSAGE
+# ==========================================================
+
+def add_chat_message(
+    sender,
+    message,
+    is_user=False
+):
+
+    if chat_box is None:
+
+        return
+
+    try:
+
+        chat_box.configure(
+            state="normal"
+        )
+
+        if is_user:
+
+            chat_box.insert(
+                tk.END,
+                "\nYou\n",
+                "user_name"
+            )
+
+            chat_box.insert(
+                tk.END,
+                f"{message}\n",
+                "user_message"
+            )
+
+        else:
+
+            chat_box.insert(
+                tk.END,
+                "\nBuddy\n",
+                "buddy_name"
+            )
+
+            chat_box.insert(
+                tk.END,
+                f"{message}\n",
+                "buddy_message"
+            )
+
+        chat_box.configure(
+            state="disabled"
+        )
+
+        chat_box.see(
+            tk.END
+        )
+
+    except Exception as e:
+
+        print(
+            "[Chat] Error:",
             repr(e)
         )
 
@@ -1062,10 +620,10 @@ def speak_async(text):
 
 def buddy_speak(text):
 
-    global last_gui_reply
-    global last_gui_reply_time
+    global speaking_active
 
-    if text is None:
+    if not text:
+
         return
 
     text = str(
@@ -1073,441 +631,111 @@ def buddy_speak(text):
     ).strip()
 
     if not text:
+
         return
 
-    last_gui_reply = text
+    # ------------------------------------------------------
+    # SOUND OFF
+    # ------------------------------------------------------
 
-    last_gui_reply_time = time.time()
+    if not sound_enabled:
 
-    add_chat(
-        "🤖 Buddy",
-        text
-    )
-
-    speak_async(
-        text
-    )
-
-
-# ==========================================================
-# PROACTIVE
-# ==========================================================
-
-def proactive_message(text):
-
-    global processing
-
-    if not proactive_enabled:
-        return
-
-    if processing:
-        return
-
-    if voice_processing:
-        return
-
-    if not text:
-        return
-
-    text = str(
-        text
-    ).strip()
-
-    if not text:
-        return
-
-    add_chat(
-        "💭 Buddy",
-        text
-    )
-
-    speak_async(
-        text
-    )
-
-
-# ==========================================================
-# BUDDY MOOD
-# ==========================================================
-
-def update_buddy_mood():
-
-    try:
-
-        mood_data = get_buddy_mood()
-
-        mood = mood_data.get(
-            "mood",
-            "normal"
+        print(
+            "[Voice] Sound OFF - skipping speech."
         )
 
-        intensity = mood_data.get(
-            "intensity",
-            0
+        set_avatar_state(
+            "idle"
         )
 
-        mood_map = {
+        update_status_online()
 
-            "normal": (
-                "🤖",
-                "Normal"
-            ),
+        return
 
-            "happy": (
-                "😊",
-                "Happy"
-            ),
+    # ------------------------------------------------------
+    # SPEAKING START
+    # ------------------------------------------------------
 
-            "excited": (
-                "🤩",
-                "Excited"
-            ),
+    speaking_active = True
 
-            "annoyed": (
-                "😒",
-                "Annoyed"
-            ),
+    set_avatar_state(
+        "speaking"
+    )
 
-            "angry": (
-                "😠",
-                "Angry"
-            ),
+    if status_label is not None:
 
-            "sad": (
-                "😔",
-                "Sad"
-            ),
+        try:
 
-            "tired": (
-                "😴",
-                "Tired"
+            status_label.configure(
+                text="● Speaking...",
+                fg=BLUE_LIGHT
             )
-        }
 
-        emoji, mood_name = mood_map.get(
-            mood,
-            (
-                "🤖",
-                "Normal"
-            )
-        )
+        except Exception:
 
-        avatar.config(
-            text=emoji
-        )
+            pass
 
-        mood_label.config(
-            text=(
-                f"{mood_name} • "
-                f"Intensity {intensity}%"
-            )
-        )
-
-    except Exception as e:
-
-        print(
-            "Mood GUI Error:",
-            repr(e)
-        )
-
-        avatar.config(
-            text="🤖"
-        )
-
-        mood_label.config(
-            text="Normal • Ready to chat"
-        )
-
-    root.after(
-        1500,
-        update_buddy_mood
+    print(
+        "[Avatar] Speaking animation START"
     )
 
+    # ------------------------------------------------------
+    # SPEAK THREAD
+    # ------------------------------------------------------
 
-# ==========================================================
-# IDLE AVATAR
-# ==========================================================
+    def speak_worker():
 
-def buddy_idle_animation():
+        global speaking_active
 
-    if not processing:
+        try:
 
-        pulse = [
-            "🤖",
-            "🤖",
-            "👀",
-            "🤖"
-        ]
+            if sound_enabled:
 
-        index = int(
-            time.time() * 2
-        ) % len(pulse)
-
-        avatar.config(
-            text=pulse[index]
-        )
-
-    root.after(
-        700,
-        buddy_idle_animation
-    )
-
-
-# ==========================================================
-# GUI STATES
-# ==========================================================
-
-def show_thinking():
-
-    update_status(
-        "Thinking...",
-        "🤔"
-    )
-
-    set_mood(
-        "🧠 Thinking • Processing..."
-    )
-
-
-def show_listening():
-
-    update_status(
-        "Listening...",
-        "🎙️"
-    )
-
-    set_mood(
-        "🎙️ Listening • Sun raha hoon..."
-    )
-
-
-def show_ready():
-
-    update_status(
-        "Ready",
-        "🟢"
-    )
-
-
-# ==========================================================
-# PROCESS MESSAGE
-# ==========================================================
-
-def process_message(message):
-
-    global processing
-    global last_gui_reply
-    global last_gui_reply_time
-
-    try:
-
-        print(
-            "\n========== GUI ROUTER =========="
-        )
-
-        print(
-            "User:",
-            message
-        )
-
-        reply = route(
-            message,
-            buddy_speak
-        )
-
-        print(
-            "GUI ROUTER RETURN:",
-            repr(reply)
-        )
-
-        if reply is not None:
-
-            reply_text = str(
-                reply
-            ).strip()
-
-            if reply_text:
-
-                current_time = time.time()
-
-                duplicate = (
-                    reply_text ==
-                    last_gui_reply
-                    and
-                    current_time -
-                    last_gui_reply_time < 2
+                real_speak(
+                    text
                 )
 
-                if not duplicate:
+        except Exception as e:
 
-                    add_chat(
-                        "🤖 Buddy",
-                        reply_text
-                    )
+            print(
+                "[Voice Error]:",
+                repr(e)
+            )
 
-                    last_gui_reply = reply_text
+        finally:
 
-                    last_gui_reply_time = current_time
+            speaking_active = False
 
-                    speak_async(
-                        reply_text
-                    )
+            print(
+                "[Avatar] Voice COMPLETE"
+            )
 
-    except Exception as e:
-
-        print(
-            "Buddy GUI Error:",
-            repr(e)
-        )
-
-        add_chat(
-            "🤖 Buddy",
-            "Sir, process karte waqt masla aa gaya."
-        )
-
-    finally:
-
-        processing = False
-
-        show_ready()
-
-
-# ==========================================================
-# SEND
-# ==========================================================
-
-def send_message():
-
-    global processing
-
-    if processing:
-        return
-
-    message = input_box.get().strip()
-
-    if not message:
-        return
-
-    register_activity()
-
-    input_box.delete(
-        0,
-        tk.END
-    )
-
-    add_chat(
-        "👤 Saad",
-        message
-    )
-
-    processing = True
-
-    show_thinking()
+            safe_after(
+                0,
+                finish_speaking
+            )
 
     threading.Thread(
-        target=process_message,
-        args=(message,),
+        target=speak_worker,
         daemon=True
     ).start()
 
 
 # ==========================================================
-# PROCESS VOICE
+# FINISH SPEAKING
 # ==========================================================
 
-def process_voice():
+def finish_speaking():
 
-    global processing
-    global voice_processing
-    global last_gui_reply
-    global last_gui_reply_time
+    set_avatar_state(
+        "idle"
+    )
 
-    try:
+    update_status_online()
 
-        voice_processing = True
-
-        message = listen()
-
-        if not message:
-
-            return
-
-        register_activity()
-
-        add_chat(
-            "👤 Saad",
-            message
-        )
-
-        show_thinking()
-
-        reply = route(
-            message,
-            buddy_speak
-        )
-
-        print(
-            "GUI VOICE RETURN:",
-            repr(reply)
-        )
-
-        if reply:
-
-            reply_text = str(
-                reply
-            ).strip()
-
-            current_time = time.time()
-
-            duplicate = (
-                reply_text ==
-                last_gui_reply
-                and
-                current_time -
-                last_gui_reply_time < 2
-            )
-
-            if not duplicate:
-
-                add_chat(
-                    "🤖 Buddy",
-                    reply_text
-                )
-
-                last_gui_reply = reply_text
-
-                last_gui_reply_time = current_time
-
-                speak_async(
-                    reply_text
-                )
-
-    except Exception as e:
-
-        print(
-            "Voice Error:",
-            repr(e)
-        )
-
-        add_chat(
-            "🤖 Buddy",
-            "Sir, voice process mein masla aa gaya."
-        )
-
-    finally:
-
-        voice_processing = False
-
-        processing = False
-
-        show_ready()
-
-        root.after(
-            0,
-            lambda: mic_button.config(
-                state="normal"
-            )
-        )
+    print(
+        "[Avatar] Speaking animation STOP"
+    )
 
 
 # ==========================================================
@@ -1516,84 +744,648 @@ def process_voice():
 
 def voice_command():
 
-    global processing
-
-    if processing:
-        return
-
-    processing = True
-
-    mic_button.config(
-        state="disabled"
+    set_avatar_state(
+        "listening"
     )
 
-    show_listening()
+    if status_label is not None:
+
+        status_label.configure(
+            text="● Listening...",
+            fg=BLUE_LIGHT
+        )
+
+    def voice_worker():
+
+        try:
+
+            result = listen()
+
+            if result:
+
+                safe_after(
+                    0,
+                    lambda r=result:
+                    process_message(r)
+                )
+
+            else:
+
+                safe_after(
+                    0,
+                    lambda:
+                    set_avatar_state(
+                        "idle"
+                    )
+                )
+
+        except Exception as e:
+
+            print(
+                "[Voice] Error:",
+                repr(e)
+            )
+
+            safe_after(
+                0,
+                lambda:
+                set_avatar_state(
+                    "idle"
+                )
+            )
+
+        finally:
+
+            # Do not force Online if a recognized
+            # message has already started processing.
+            pass
 
     threading.Thread(
-        target=process_voice,
+        target=voice_worker,
         daemon=True
     ).start()
 
 
 # ==========================================================
-# CLEAR CHAT
+# ONLINE STATUS
 # ==========================================================
 
-def clear_chat():
+def update_status_online():
 
-    chat_box.config(
-        state="normal"
-    )
+    if status_label is None:
 
-    chat_box.delete(
-        "1.0",
-        tk.END
-    )
+        return
 
-    chat_box.insert(
-        tk.END,
-        "🤖 Buddy: Chat clear kar di Sir.\n\n"
-    )
+    try:
 
-    chat_box.insert(
-        tk.END,
-        "🤖 Buddy: Ab fresh start karte hain. 😎\n"
-    )
+        if sound_enabled:
 
-    chat_box.config(
-        state="disabled"
-    )
+            status_label.configure(
+                text="● Online",
+                fg=GREEN
+            )
+
+        else:
+
+            status_label.configure(
+                text="● Online • Muted",
+                fg=YELLOW
+            )
+
+    except Exception:
+
+        pass
 
 
 # ==========================================================
-# BUDDY GUI
+# PROCESS MESSAGE
 # ==========================================================
 
-def open_buddy_gui():
+def process_message(
+    message=None
+):
 
-    global proactive_enabled
-    global top_bar
-    global maximize_button
+    if message is None:
 
-    proactive_enabled = True
+        try:
 
-    clear_root()
+            message = (
+                entry_box
+                .get()
+                .strip()
+            )
 
-    root.resizable(
-        True,
-        True
+        except Exception:
+
+            return
+
+    if not message:
+
+        return
+
+    try:
+
+        entry_box.delete(
+            0,
+            tk.END
+        )
+
+    except Exception:
+
+        pass
+
+    add_chat_message(
+        "You",
+        message,
+        is_user=True
     )
 
-    screen_width = root.winfo_screenwidth()
+    set_avatar_state(
+        "thinking"
+    )
 
-    screen_height = root.winfo_screenheight()
+    if status_label is not None:
 
-    x = screen_width - WIDTH - 25
+        status_label.configure(
+            text="● Thinking...",
+            fg=YELLOW
+        )
 
-    y = screen_height - HEIGHT - 55
+    def ai_worker():
 
-    root.geometry(
-        f"{WIDTH}x{HEIGHT}+{x}+{y}"
+        try:
+
+            print(
+                "\n========== GUI ROUTER =========="
+            )
+
+            print(
+                "User:",
+                message
+            )
+
+            try:
+
+                mood_result = get_buddy_mood()
+
+                print(
+                    "Buddy Mood:",
+                    mood_result
+                )
+
+            except Exception as e:
+
+                print(
+                    "Mood Error:",
+                    repr(e)
+                )
+
+            try:
+
+                reply = route(
+                    message
+                )
+
+            except TypeError:
+
+                reply = route(
+                    message,
+                    ""
+                )
+
+            if reply is None:
+
+                reply = (
+                    "Sir, mujhe is waqt jawab dene mein "
+                    "thora masla aa raha hai."
+                )
+
+            reply = str(
+                reply
+            ).strip()
+
+            print(
+                "Buddy Reply:",
+                repr(reply)
+            )
+
+            lower_reply = reply.lower()
+
+            if any(
+                word in lower_reply
+                for word in [
+                    "sorry",
+                    "fikr",
+                    "pareshan",
+                    "masla",
+                    "concern"
+                ]
+            ):
+
+                next_state = "concerned"
+
+            elif any(
+                word in lower_reply
+                for word in [
+                    "haha",
+                    "hehe",
+                    "khushi",
+                    "great",
+                    "zabardast",
+                    "nice",
+                    "lol"
+                ]
+            ):
+
+                next_state = "happy"
+
+            else:
+
+                next_state = "speaking"
+
+            safe_after(
+                0,
+                lambda r=reply:
+                add_chat_message(
+                    "Buddy",
+                    r,
+                    is_user=False
+                )
+            )
+
+            safe_after(
+                100,
+                lambda r=reply:
+                buddy_speak(r)
+            )
+
+        except Exception as e:
+
+            print(
+                "[GUI Router] Error:",
+                repr(e)
+            )
+
+            error_reply = (
+                "Sir, abhi Buddy ko jawab dene mein "
+                "thora technical masla aa gaya."
+            )
+
+            safe_after(
+                0,
+                lambda:
+                add_chat_message(
+                    "Buddy",
+                    error_reply,
+                    is_user=False
+                )
+            )
+
+            safe_after(
+                0,
+                lambda:
+                set_avatar_state(
+                    "concerned"
+                )
+            )
+
+            safe_after(
+                100,
+                lambda:
+                buddy_speak(
+                    error_reply
+                )
+            )
+
+    threading.Thread(
+        target=ai_worker,
+        daemon=True
+    ).start()
+
+
+# ==========================================================
+# ENTER
+# ==========================================================
+
+def on_enter(event=None):
+
+    process_message()
+
+    return "break"
+
+
+# ==========================================================
+# CLOCK
+# ==========================================================
+
+def update_clock():
+
+    if root is None:
+
+        return
+
+    try:
+
+        now = datetime.datetime.now()
+
+        if clock_label is not None:
+
+            clock_label.configure(
+                text=now.strftime(
+                    "%I:%M %p"
+                )
+            )
+
+        elapsed = int(
+            time.time()
+            - start_time
+        )
+
+        hours = (
+            elapsed
+            // 3600
+        )
+
+        minutes = (
+            elapsed % 3600
+        ) // 60
+
+        seconds = (
+            elapsed % 60
+        )
+
+        if uptime_label is not None:
+
+            uptime_label.configure(
+                text=(
+                    f"Uptime "
+                    f"{hours:02d}:"
+                    f"{minutes:02d}:"
+                    f"{seconds:02d}"
+                )
+            )
+
+        root.after(
+            1000,
+            update_clock
+        )
+
+    except Exception:
+
+        pass
+
+
+# ==========================================================
+# SIDEBAR BUTTON HELPER
+# ==========================================================
+
+def create_sidebar_button(
+    parent,
+    text,
+    command,
+    color=TEXT_COLOR
+):
+
+    button = tk.Button(
+        parent,
+        text=text,
+        command=command,
+        bg=CARD_COLOR,
+        fg=color,
+        activebackground=CARD_LIGHT,
+        activeforeground=TEXT_COLOR,
+        relief="flat",
+        bd=0,
+        font=(
+            "Segoe UI",
+            9,
+            "bold"
+        ),
+        anchor="w",
+        padx=14,
+        cursor="hand2"
+    )
+
+    button.pack(
+        fill="x",
+        padx=18,
+        pady=3
+    )
+
+    return button
+
+
+# ==========================================================
+# SIDEBAR
+# ==========================================================
+
+def build_sidebar(parent):
+
+    global sidebar_avatar_label
+    global status_label
+    global clock_label
+    global uptime_label
+    global sound_button
+
+    sidebar = tk.Frame(
+        parent,
+        bg=SIDEBAR_COLOR,
+        width=230
+    )
+
+    sidebar.pack(
+        side="left",
+        fill="y"
+    )
+
+    sidebar.pack_propagate(
+        False
+    )
+
+    logo = tk.Label(
+        sidebar,
+        text="BUDDY AI",
+        font=(
+            "Segoe UI",
+            20,
+            "bold"
+        ),
+        fg=TEXT_COLOR,
+        bg=SIDEBAR_COLOR
+    )
+
+    logo.pack(
+        pady=(25, 4)
+    )
+
+    subtitle = tk.Label(
+        sidebar,
+        text="Your Living AI Companion",
+        font=(
+            "Segoe UI",
+            9
+        ),
+        fg=SECONDARY_TEXT,
+        bg=SIDEBAR_COLOR
+    )
+
+    subtitle.pack(
+        pady=(0, 20)
+    )
+
+    avatar_card = tk.Frame(
+        sidebar,
+        bg=CARD_COLOR,
+        width=190,
+        height=180
+    )
+
+    avatar_card.pack(
+        padx=18,
+        pady=5
+    )
+
+    avatar_card.pack_propagate(
+        False
+    )
+
+    sidebar_avatar_label = tk.Label(
+        avatar_card,
+        bg=CARD_COLOR
+    )
+
+    sidebar_avatar_label.pack(
+        expand=True
+    )
+
+    status_title = tk.Label(
+        sidebar,
+        text="STATUS",
+        font=(
+            "Segoe UI",
+            8,
+            "bold"
+        ),
+        fg=SECONDARY_TEXT,
+        bg=SIDEBAR_COLOR
+    )
+
+    status_title.pack(
+        pady=(16, 2)
+    )
+
+    status_label = tk.Label(
+        sidebar,
+        text="● Online",
+        font=(
+            "Segoe UI",
+            11,
+            "bold"
+        ),
+        fg=GREEN,
+        bg=SIDEBAR_COLOR
+    )
+
+    status_label.pack()
+
+    clock_label = tk.Label(
+        sidebar,
+        text="--:--",
+        font=(
+            "Segoe UI",
+            20,
+            "bold"
+        ),
+        fg=TEXT_COLOR,
+        bg=SIDEBAR_COLOR
+    )
+
+    clock_label.pack(
+        pady=(15, 0)
+    )
+
+    uptime_label = tk.Label(
+        sidebar,
+        text="Uptime 00:00:00",
+        font=(
+            "Segoe UI",
+            8
+        ),
+        fg=SECONDARY_TEXT,
+        bg=SIDEBAR_COLOR
+    )
+
+    uptime_label.pack(
+        pady=(2, 12)
+    )
+
+    # ======================================================
+    # CONTROLS
+    # ======================================================
+
+    controls_title = tk.Label(
+        sidebar,
+        text="CONTROLS",
+        font=(
+            "Segoe UI",
+            8,
+            "bold"
+        ),
+        fg=SECONDARY_TEXT,
+        bg=SIDEBAR_COLOR
+    )
+
+    controls_title.pack(
+        pady=(2, 6)
+    )
+
+    sound_button = create_sidebar_button(
+        sidebar,
+        "🔊 Sound ON",
+        toggle_sound,
+        GREEN
+    )
+
+    create_sidebar_button(
+        sidebar,
+        "⏹ Stop Speaking",
+        stop_speaking,
+        RED
+    )
+
+    create_sidebar_button(
+        sidebar,
+        "🧹 Clear Chat",
+        clear_chat,
+        TEXT_COLOR
+    )
+
+    # ======================================================
+    # BOTTOM INFO
+    # ======================================================
+
+    info = tk.Label(
+        sidebar,
+        text=(
+            "Buddy is here.\n"
+            "Always ready to help."
+        ),
+        font=(
+            "Segoe UI",
+            9
+        ),
+        fg=SECONDARY_TEXT,
+        bg=SIDEBAR_COLOR,
+        justify="center"
+    )
+
+    info.pack(
+        side="bottom",
+        pady=20
+    )
+
+    return sidebar
+
+
+# ==========================================================
+# CHAT AREA
+# ==========================================================
+
+def build_chat_area(parent):
+
+    global chat_box
+    global entry_box
+    global avatar_label
+
+    content = tk.Frame(
+        parent,
+        bg=BG_COLOR
+    )
+
+    content.pack(
+        side="left",
+        fill="both",
+        expand=True
     )
 
     # ======================================================
@@ -1601,9 +1393,9 @@ def open_buddy_gui():
     # ======================================================
 
     top_bar = tk.Frame(
-        root,
-        bg=TOP,
-        height=50
+        content,
+        bg=BG_COLOR,
+        height=60
     )
 
     top_bar.pack(
@@ -1614,620 +1406,460 @@ def open_buddy_gui():
         False
     )
 
-    top_bar.bind(
-        "<Button-1>",
-        start_drag
-    )
-
-    top_bar.bind(
-        "<B1-Motion>",
-        drag_window
-    )
-
     title = tk.Label(
         top_bar,
-        text="🤖  Buddy AI",
+        text="Buddy",
         font=(
             "Segoe UI",
-            14,
+            17,
             "bold"
         ),
-        bg=TOP,
-        fg=TEXT
+        fg=TEXT_COLOR,
+        bg=BG_COLOR
     )
 
     title.pack(
         side="left",
-        padx=14
+        padx=20,
+        pady=15
     )
 
-    title.bind(
-        "<Button-1>",
-        start_drag
-    )
-
-    title.bind(
-        "<B1-Motion>",
-        drag_window
-    )
-
-    # ======================================================
-    # WINDOW BUTTONS
-    # ======================================================
-
-    window_buttons = tk.Frame(
+    sub = tk.Label(
         top_bar,
-        bg=TOP
-    )
-
-    window_buttons.pack(
-        side="right",
-        padx=5
-    )
-
-    tk.Button(
-        window_buttons,
-        text="—",
-        font=(
-            "Segoe UI",
-            11,
-            "bold"
-        ),
-        bg=TOP,
-        fg=MUTED,
-        activebackground=TOP,
-        activeforeground=TEXT,
-        bd=0,
-        width=3,
-        command=minimize_buddy,
-        cursor="hand2"
-    ).pack(
-        side="left"
-    )
-
-    maximize_button = tk.Button(
-        window_buttons,
-        text="□",
-        font=(
-            "Segoe UI",
-            10,
-            "bold"
-        ),
-        bg=TOP,
-        fg=MUTED,
-        activebackground=TOP,
-        activeforeground=TEXT,
-        bd=0,
-        width=3,
-        command=toggle_maximize,
-        cursor="hand2"
-    )
-
-    maximize_button.pack(
-        side="left"
-    )
-
-    tk.Button(
-        window_buttons,
-        text="✕",
-        font=(
-            "Segoe UI",
-            11,
-            "bold"
-        ),
-        bg=TOP,
-        fg=PINK,
-        activebackground=TOP,
-        activeforeground=PINK,
-        bd=0,
-        width=3,
-        command=close_buddy,
-        cursor="hand2"
-    ).pack(
-        side="left"
-    )
-
-    # ======================================================
-    # AVATAR CARD
-    # ======================================================
-
-    avatar_card = tk.Frame(
-        root,
-        bg=WHITE,
-        height=205,
-        highlightthickness=1,
-        highlightbackground=BORDER
-    )
-
-    avatar_card.pack(
-        fill="x",
-        padx=10,
-        pady=10
-    )
-
-    avatar_card.pack_propagate(
-        False
-    )
-
-    global avatar
-    global mood_label
-    global birthday_label
-    global uptime_label
-
-    avatar = tk.Label(
-        avatar_card,
-        text="🤖",
-        font=(
-            "Segoe UI Emoji",
-            70
-        ),
-        bg=WHITE,
-        fg=TEXT
-    )
-
-    avatar.pack(
-        pady=(5, 0)
-    )
-
-    mood_label = tk.Label(
-        avatar_card,
-        text="Normal • Ready to chat",
-        font=(
-            "Segoe UI",
-            10,
-            "bold"
-        ),
-        bg=WHITE,
-        fg=PURPLE
-    )
-
-    mood_label.pack()
-
-    birthday_label = tk.Label(
-        avatar_card,
-        text="🎁 Birthday Countdown...",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=WHITE,
-        fg=PINK
-    )
-
-    birthday_label.pack(
-        pady=(7, 0)
-    )
-
-    uptime_label = tk.Label(
-        avatar_card,
-        text="⚡ Online 00:00:00",
-        font=(
-            "Segoe UI",
-            8
-        ),
-        bg=WHITE,
-        fg=MUTED
-    )
-
-    uptime_label.pack(
-        pady=(4, 0)
-    )
-
-    # ======================================================
-    # STATUS ROW
-    # ======================================================
-
-    status_row = tk.Frame(
-        root,
-        bg=BG
-    )
-
-    status_row.pack(
-        fill="x",
-        padx=16,
-        pady=(0, 7)
-    )
-
-    global status_label
-    global clock_label
-
-    status_label = tk.Label(
-        status_row,
-        text="🟢 Ready",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=BG,
-        fg=GREEN
-    )
-
-    status_label.pack(
-        side="left"
-    )
-
-    clock_label = tk.Label(
-        status_row,
-        text="🕐 --:--:--",
+        text="Living Companion",
         font=(
             "Segoe UI",
             9
         ),
-        bg=BG,
-        fg=MUTED
+        fg=SECONDARY_TEXT,
+        bg=BG_COLOR
     )
 
-    clock_label.pack(
-        side="right"
+    sub.pack(
+        side="left",
+        pady=18
     )
 
     # ======================================================
-    # CHAT CARD
+    # MAIN AVATAR
     # ======================================================
 
-    chat_card = tk.Frame(
-        root,
-        bg=WHITE,
-        highlightthickness=1,
-        highlightbackground=BORDER
+    avatar_frame = tk.Frame(
+        content,
+        bg=BG_COLOR,
+        height=175
     )
 
-    chat_card.pack(
+    avatar_frame.pack(
+        fill="x"
+    )
+
+    avatar_frame.pack_propagate(
+        False
+    )
+
+    avatar_label = tk.Label(
+        avatar_frame,
+        bg=BG_COLOR
+    )
+
+    avatar_label.place(
+        relx=0.5,
+        rely=0.5,
+        anchor="center"
+    )
+
+    # ======================================================
+    # CHAT CONTAINER
+    # ======================================================
+
+    chat_container = tk.Frame(
+        content,
+        bg=BG_COLOR
+    )
+
+    chat_container.pack(
         fill="both",
         expand=True,
-        padx=10,
-        pady=(0, 8)
+        padx=18,
+        pady=(0, 10)
     )
 
-    global chat_box
-
-    chat_box = scrolledtext.ScrolledText(
-        chat_card,
-        bg=CHAT,
-        fg=TEXT,
-        insertbackground=TEXT,
-        selectbackground="#CFE5FA",
-        selectforeground=TEXT,
+    chat_box = tk.Text(
+        chat_container,
+        bg=CARD_COLOR,
+        fg=TEXT_COLOR,
         font=(
             "Segoe UI",
-            10
+            11
         ),
-        bd=0,
         relief="flat",
+        bd=0,
         wrap="word",
-        padx=12,
-        pady=10
+        padx=18,
+        pady=12,
+        insertbackground=TEXT_COLOR
     )
 
     chat_box.pack(
         fill="both",
-        expand=True,
-        padx=2,
-        pady=2
+        expand=True
     )
 
-    # ======================================================
-    # WELCOME
-    # ======================================================
-
-    username = get_user_name()
-
-    if not username:
-        username = "Sir"
-
-    chat_box.insert(
-        tk.END,
-        f"🤖 Buddy: Assalam-o-Alaikum {username}! ❤️\n\n"
+    chat_box.tag_configure(
+        "user_name",
+        foreground=BLUE_LIGHT,
+        font=(
+            "Segoe UI",
+            10,
+            "bold"
+        )
     )
 
-    chat_box.insert(
-        tk.END,
-        "🤖 Buddy: Main ready hoon. 😎\n\n"
+    chat_box.tag_configure(
+        "buddy_name",
+        foreground=GREEN,
+        font=(
+            "Segoe UI",
+            10,
+            "bold"
+        )
     )
 
-    chat_box.insert(
-        tk.END,
-        "🎁 Buddy: Birthday countdown active hai! 🎉\n\n"
+    chat_box.tag_configure(
+        "user_message",
+        foreground=TEXT_COLOR,
+        spacing3=8
     )
 
-    chat_box.insert(
-        tk.END,
-        "⚡ Buddy: Living Companion Mode ON.\n\n"
+    chat_box.tag_configure(
+        "buddy_message",
+        foreground=TEXT_COLOR,
+        spacing3=8
     )
 
-    chat_box.insert(
-        tk.END,
-        "💡 Buddy: Neeche message likhein ya Voice dabayein.\n\n"
-    )
-
-    chat_box.insert(
-        tk.END,
-        "🟢 Buddy: Main aapke sawal ka jawab dete waqt random proactive messages nahi bhejunga. 😎\n"
-    )
-
-    chat_box.config(
+    chat_box.configure(
         state="disabled"
     )
 
     # ======================================================
-    # INPUT TITLE
+    # INPUT AREA
     # ======================================================
 
-    tk.Label(
-        root,
-        text="💬  Message Buddy",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg=BG,
-        fg=MUTED
-    ).pack(
-        anchor="w",
-        padx=12,
-        pady=(0, 4)
+    input_frame = tk.Frame(
+        content,
+        bg=BG_COLOR,
+        height=70
     )
 
-    # ======================================================
-    # INPUT ROW
-    # ======================================================
-
-    input_row = tk.Frame(
-        root,
-        bg=BG
-    )
-
-    input_row.pack(
+    input_frame.pack(
         fill="x",
-        padx=10,
-        pady=(0, 7)
+        padx=18,
+        pady=(0, 18)
     )
 
-    global input_box
+    input_frame.pack_propagate(
+        False
+    )
 
-    input_box = tk.Entry(
-        input_row,
+    entry_box = tk.Entry(
+        input_frame,
+        bg=CARD_LIGHT,
+        fg=TEXT_COLOR,
         font=(
             "Segoe UI",
-            10
+            11
         ),
-        bg=WHITE,
-        fg=TEXT,
-        insertbackground=TEXT,
-        bd=0,
         relief="flat",
-        highlightthickness=1,
-        highlightbackground=BORDER,
-        highlightcolor=BLUE
+        bd=0,
+        insertbackground=TEXT_COLOR
     )
 
-    input_box.pack(
+    entry_box.pack(
         side="left",
-        fill="x",
+        fill="both",
         expand=True,
-        ipady=11,
-        padx=(0, 7)
+        padx=(0, 8)
     )
 
-    tk.Button(
-        input_row,
-        text="➤ SEND",
+    entry_box.bind(
+        "<Return>",
+        on_enter
+    )
+
+    # ======================================================
+    # MIC BUTTON
+    # ======================================================
+
+    voice_button = tk.Button(
+        input_frame,
+        text="🎙",
+        command=voice_command,
+        bg=CARD_LIGHT,
+        fg=TEXT_COLOR,
+        activebackground=BLUE,
+        activeforeground="white",
+        relief="flat",
+        bd=0,
         font=(
-            "Segoe UI",
-            9,
-            "bold"
+            "Segoe UI Emoji",
+            14
         ),
+        width=4,
+        cursor="hand2"
+    )
+
+    voice_button.pack(
+        side="left",
+        padx=(0, 8)
+    )
+
+    # ======================================================
+    # SEND BUTTON
+    # ======================================================
+
+    send_button = tk.Button(
+        input_frame,
+        text="Send",
+        command=process_message,
         bg=BLUE,
         fg="white",
-        activebackground=BLUE_HOVER,
+        activebackground=BLUE_LIGHT,
         activeforeground="white",
+        relief="flat",
         bd=0,
-        padx=12,
-        pady=9,
-        command=send_message,
-        cursor="hand2"
-    ).pack(
-        side="right"
-    )
-
-    # ======================================================
-    # ACTION BAR
-    # ======================================================
-
-    action_bar = tk.Frame(
-        root,
-        bg=BG
-    )
-
-    action_bar.pack(
-        fill="x",
-        padx=10,
-        pady=(0, 8)
-    )
-
-    global mic_button
-
-    mic_button = tk.Button(
-        action_bar,
-        text="🎤  VOICE",
         font=(
             "Segoe UI",
             10,
             "bold"
         ),
-        bg=GREEN_BG,
-        fg="#16845A",
-        activebackground="#C9F0DE",
-        activeforeground="#126B49",
-        bd=0,
-        padx=28,
-        pady=9,
-        command=voice_command,
+        padx=18,
         cursor="hand2"
     )
 
-    mic_button.pack(
-        side="left"
-    )
-
-    tk.Button(
-        action_bar,
-        text="🗑  CLEAR CHAT",
-        font=(
-            "Segoe UI",
-            10,
-            "bold"
-        ),
-        bg=PINK_BG,
-        fg="#C44E66",
-        activebackground="#F8DCE3",
-        activeforeground="#A83E55",
-        bd=0,
-        padx=20,
-        pady=9,
-        command=clear_chat,
-        cursor="hand2"
-    ).pack(
-        side="left",
-        padx=(7, 0)
-    )
-
-    # ======================================================
-    # LOGOUT
-    # ======================================================
-
-    tk.Button(
-        action_bar,
-        text="🚪 LOGOUT",
-        font=(
-            "Segoe UI",
-            9,
-            "bold"
-        ),
-        bg="#F1F3F5",
-        fg=MUTED,
-        activebackground="#E2E6EA",
-        activeforeground=TEXT,
-        bd=0,
-        padx=13,
-        pady=9,
-        command=perform_logout,
-        cursor="hand2"
-    ).pack(
+    send_button.pack(
         side="right"
     )
 
-    # ======================================================
-    # BOTTOM
-    # ======================================================
-
-    tk.Label(
-        root,
-        text=(
-            "🎤 Voice  •  ➤ Send  •  "
-            "🤖 Buddy is listening"
-        ),
-        font=(
-            "Segoe UI",
-            8
-        ),
-        bg=BG,
-        fg=MUTED
-    ).pack(
-        anchor="w",
-        padx=12,
-        pady=(0, 8)
-    )
-
-    # ======================================================
-    # ENTER KEY
-    # ======================================================
-
-    input_box.bind(
-        "<Return>",
-        lambda event: send_message()
-    )
-
-    # ======================================================
-    # START SYSTEMS
-    # ======================================================
-
-    update_clock()
-
-    update_uptime()
-
-    update_birthday()
-
-    update_status(
-        "Ready",
-        "🟢"
-    )
-
-    update_buddy_mood()
-
-    buddy_idle_animation()
-
-    # ======================================================
-    # PROACTIVE
-    # ======================================================
-
-    set_proactive_callback(
-        proactive_message
-    )
-
-    start_proactive()
-
-    # ======================================================
-    # FOCUS
-    # ======================================================
-
-    input_box.focus_set()
+    return content
 
 
 # ==========================================================
-# SAFE SHUTDOWN
+# PROACTIVE MESSAGE
 # ==========================================================
 
-def on_closing():
+def proactive_message(message):
+
+    if not message:
+
+        return
+
+    text = str(
+        message
+    ).strip()
+
+    blocked_phrases = [
+
+        "standby par hoon",
+        "standby par h",
+        "buddy standby",
+        "ready and waiting",
+        "ready to help",
+        "i am waiting",
+        "main wait kar raha",
+        "main yahin hoon",
+        "main yahan hoon",
+        "waiting for you"
+
+    ]
+
+    lower_text = text.lower()
+
+    if any(
+        phrase in lower_text
+        for phrase in blocked_phrases
+    ):
+
+        print(
+            "[Proactive] Blocked filler:",
+            text
+        )
+
+        return
+
+    safe_after(
+        0,
+        lambda m=text:
+        add_chat_message(
+            "Buddy",
+            m,
+            is_user=False
+        )
+    )
+
+    safe_after(
+        0,
+        lambda:
+        set_avatar_state(
+            "happy"
+        )
+    )
+
+    safe_after(
+        100,
+        lambda m=text:
+        buddy_speak(
+            m
+        )
+    )
+
+
+# ==========================================================
+# DELAYED PROACTIVE START
+# ==========================================================
+
+def delayed_proactive_start():
+
+    try:
+
+        set_proactive_callback(
+            proactive_message
+        )
+
+        start_proactive()
+
+        print(
+            "Buddy Proactive Presence Started"
+        )
+
+    except Exception as e:
+
+        print(
+            "[Proactive] Error:",
+            repr(e)
+        )
+
+
+# ==========================================================
+# WINDOW CLOSE
+# ==========================================================
+
+def on_close():
 
     try:
 
         stop_proactive()
 
+    except Exception as e:
+
+        print(
+            "[Proactive] Stop Error:",
+            repr(e)
+        )
+
+    try:
+
+        stop_speaking()
+
     except Exception:
+
         pass
 
-    root.destroy()
+    try:
 
+        if root is not None:
 
-root.protocol(
-    "WM_DELETE_WINDOW",
-    on_closing
-)
+            root.destroy()
+
+    except Exception:
+
+        pass
 
 
 # ==========================================================
-# STARTUP
+# MAIN GUI
 # ==========================================================
 
-if not account_exists():
+def open_buddy_gui():
 
-    create_account_screen()
+    global root
 
-elif should_auto_login():
+    root = tk.Tk()
+
+    root.title(
+        "Buddy AI"
+    )
+
+    root.geometry(
+        "1050x720"
+    )
+
+    root.minsize(
+        850,
+        600
+    )
+
+    root.configure(
+        bg=BG_COLOR
+    )
+
+    root.protocol(
+        "WM_DELETE_WINDOW",
+        on_close
+    )
+
+    load_avatar_images()
+
+    main = tk.Frame(
+        root,
+        bg=BG_COLOR
+    )
+
+    main.pack(
+        fill="both",
+        expand=True
+    )
+
+    build_sidebar(
+        main
+    )
+
+    build_chat_area(
+        main
+    )
+
+    set_avatar_state(
+        "idle"
+    )
+
+    add_chat_message(
+        "Buddy",
+        "Main yahin hoon Sir. Jab zarurat ho bula lena.",
+        is_user=False
+    )
+
+    avatar_breathing_animation()
+
+    update_clock()
+
+    safe_after(
+        60000,
+        delayed_proactive_start
+    )
+
+    if entry_box is not None:
+
+        entry_box.focus_set()
+
+    update_sound_button()
+
+    root.mainloop()
+
+
+# ==========================================================
+# START
+# ==========================================================
+
+if __name__ == "__main__":
 
     open_buddy_gui()
-
-else:
-
-    create_login_screen()
-
-
-# ==========================================================
-# MAIN LOOP
-# ==========================================================
-
-root.mainloop()

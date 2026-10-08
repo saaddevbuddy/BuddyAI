@@ -140,6 +140,16 @@ INTENTS = {
         "my profile"
     ],
 
+    "youtuber_save": [
+    "mera favourite youtuber",
+    "my favourite youtuber"
+],
+
+    "youtuber_ask": [
+        "mera favourite youtuber kya hai",
+        "favourite youtuber kya hai"
+],
+
     # ------------------- Conversation -------------------
 
     "greeting": [
